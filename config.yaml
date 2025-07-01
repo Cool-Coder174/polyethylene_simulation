@@ -1,0 +1,62 @@
+# config.yaml
+# --- Central configuration for the Polymer Degradation Simulation ---
+
+# --- Simulation Environment Parameters ---
+simulation:
+  # Initial state for the environment when reset
+  initial_params:
+    Lchain: 100
+    Nchain: 50
+    time: 90
+    dose_rate: 0.74
+  
+  # Parameter space boundaries for the RL agent's actions
+  param_bounds:
+    Lchain: [10, 500]
+    Nchain: [5, 100]
+    time: [30, 365]
+    dose_rate: [0.1, 1.5]
+
+  # Target for the reward function
+  reward_targets:
+    # The ideal average node connectivity we want the agent to achieve
+    target_connectivity: 3.5
+    # How much tolerance we allow around the target
+    connectivity_tolerance: 0.2
+
+# --- Reinforcement Learning Agent Parameters ---
+agent:
+  # State and action dimensions for the neural network
+  state_dim: 6  # [Lchain, Nchain, time, dose_rate, avg_connectivity, l2_eigenvalue]
+  action_dim: 4 # Relative changes to [Lchain, Nchain, time, dose_rate]
+  max_action: 0.2 # Agent can change a parameter by a maximum of +/- 20% per step
+
+  # TD3 Algorithm Hyperparameters (to be tuned by Optuna)
+  gamma: 0.99       # Discount factor for future rewards
+  tau: 0.005        # Target network update rate
+  policy_noise: 0.2   # Noise added to target policy during critic update
+  noise_clip: 0.5     # Range to clip target policy noise
+  policy_freq: 2      # Frequency of delayed policy updates
+
+# --- Training and Optimization Parameters ---
+training:
+  # Optuna Hyperparameter Search
+  enable_optuna: true
+  optuna_trials: 100  # Number of hyperparameter sets to test
+
+  # Main Training Loop
+  episodes: 500
+  batch_size: 128
+  
+  # Penalty for actions to encourage efficiency
+  action_cost_penalty: 0.05 # Penalty factor for the magnitude of the action
+
+# --- File and Directory Paths ---
+paths:
+  # Central database for logging all simulation results
+  database_file: "simulation_results.db"
+  # Directory to save trained RL models
+  model_dir: "models"
+  # Directory for saving plots
+  plot_dir: "plots"
+
