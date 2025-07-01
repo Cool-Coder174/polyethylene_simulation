@@ -8,6 +8,7 @@ import random
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Actor(nn.Module):
+    # ... (This class does not need any changes) ...
     def __init__(self, state_dim, action_dim, max_action):
         super().__init__()
         self.l1 = nn.Linear(state_dim, 400)
@@ -22,6 +23,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
+    # ... (This class does not need any changes) ...
     def __init__(self, state_dim, action_dim):
         super().__init__()
         self.q1 = nn.Sequential(
@@ -42,23 +44,25 @@ class Critic(nn.Module):
 
 
 class TD3:
-    def __init__(self, state_dim, action_dim, max_action):
+    # --- MODIFICATION IS HERE ---
+    def __init__(self, state_dim, action_dim, max_action, learning_rate=3e-4, gamma=0.99, tau=0.005):
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_target = copy.deepcopy(self.actor)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=1e-3)
+        # Use the variable learning_rate
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
 
         self.critic = Critic(state_dim, action_dim).to(device)
         self.critic_target = copy.deepcopy(self.critic)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=1e-3)
+        # Use the variable learning_rate
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
 
         self.max_action = max_action
+        self.gamma = gamma # Store gamma for use in training
+        self.tau = tau   # Store tau for use in training
         self.total_it = 0
 
-    def select_action(self, state):
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        return self.actor(state).cpu().data.numpy().flatten()
-
-    def train(self, replay_buffer, batch_size=100, gamma=0.99, tau=0.005, policy_noise=0.2, noise_clip=0.5, policy_freq=2):
+    # The train method now uses the stored gamma and tau values
+    def train(self, replay_buffer, batch_size=100, policy_noise=0.2, noise_clip=0.5, policy_freq=2):
         self.total_it += 1
 
         # Sample replay buffer
@@ -77,7 +81,8 @@ class TD3:
         # Compute the target Q value
         target_Q1, target_Q2 = self.critic_target(next_state, next_action)
         target_Q = torch.min(target_Q1, target_Q2)
-        target_Q = reward + (1 - done) * gamma * target_Q
+        # Use self.gamma
+        target_Q = reward + (1 - done) * self.gamma * target_Q
 
         # Get current Q estimates
         current_Q1, current_Q2 = self.critic(state, action)
@@ -98,18 +103,20 @@ class TD3:
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            # Update the frozen target models
+            # Update the frozen target models using self.tau
             for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-                target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-                target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
     def save(self, filename):
-        torch.save(self.actor.state_dict(), filename + "_actor.pth")
-        torch.save(self.critic.state_dict(), filename + "_critic.pth")
+        torch.save(self.actor.state_dict(), str(filename) + "_actor.pth")
+        torch.save(self.critic.state_dict(), str(filename) + "_critic.pth")
 
     def load(self, filename):
-        self.actor.load_state_dict(torch.load(filename + "_actor.pth"))
-        self.critic.load_state_dict(torch.load(filename + "_critic.pth"))
+        self.actor.load_state_dict(torch.load(str(filename) + "_actor.pth"))
+        self.critic.load_state_dict(torch.load(str(filename) + "_critic.pth"))
+        self.actor_target = copy.deepcopy(self.actor)
+        self.critic_target = copy.deepcopy(self.critic)
 
