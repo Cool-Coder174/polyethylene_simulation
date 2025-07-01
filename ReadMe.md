@@ -1,9 +1,11 @@
-Intelligent Polymer Degradation Simulator
+#Intelligent Polymer Degradation Simulator
 This project uses a Deep Reinforcement Learning (DRL) agent to intelligently explore and control the simulated degradation of polyethylene. It models the complex interplay of crosslinking and chain scission over time, driven by a physically grounded model and guided by a goal-oriented AI.
-TL;DR: What is this?
+
+#TL;DR: What is this?
 Imagine trying to predict how a plastic material will break down over decades. It's a slow, complex process. This project builds a virtual laboratory to do just that. We create a 3D model of plastic chains and simulate their degradation (breaking apart and tangling together) over time.
 The "intelligent" part is a self-learning AI (a Reinforcement Learning agent) that runs these simulations. Its goal is to figure out which conditions (like material structure and radiation dose) lead to specific outcomes, such as achieving a desired level of material strength. It's like an AI scientist running thousands of experiments to discover the fundamental rules of polymer aging, all within a computer.
-Key Features
+
+#Key Features
 🤖 Intelligent Agent Control: A Twin-Delayed Deep Deterministic Policy Gradient (TD3) agent autonomously controls simulation parameters to achieve a target material state.
 🔬 Physically-Grounded Simulation: The model simulates polymer chains in 3D space, with degradation events (crosslinking and scission) influenced by spatial proximity and local stress.
 ⚙️ Hyperparameter Optimization: Integrated with Optuna to automatically find the most effective hyperparameters for the DRL agent.
