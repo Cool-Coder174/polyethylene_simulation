@@ -51,7 +51,7 @@ pip install -r requirements.txt
 
 ---
 
-## 👨‍💻 For Engineers & Computer Scientists
+## 👨‍💻 For Software Engineers
 
 This is a closed-loop learning system. The TD3 agent interacts with a gym-like environment to learn how to control a dynamic degradation simulation.
 
