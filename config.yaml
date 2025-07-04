@@ -1,62 +1,72 @@
 # config.yaml
-# --- Central configuration for the Polymer Degradation Simulation ---
+# --- Centralized Configuration for the Polymer Simulation Experiment ---
 
-# --- Simulation Environment Parameters ---
-simulation:
-  # Initial state for the environment when reset
-  initial_params:
-    Lchain: 100
-    Nchain: 50
-    time: 90
-    dose_rate: 0.74
-  
-  # Parameter space boundaries for the RL agent's actions
+# --- 1. Run Parameters: Initial conditions and goals ---
+run_parameters:
+  l_chain: 100
+  n_chain: 50
+  total_simulation_time: 864000 # in seconds (e.g., 10 days)
+  target_properties:
+    target_crosslink_density: 0.1
+    crosslink_tolerance: 0.02
   param_bounds:
-    Lchain: [10, 500]
-    Nchain: [5, 100]
-    time: [30, 365]
-    dose_rate: [0.1, 1.5]
+    dose_rate: [0.0, 10.0] # Min and Max dose rate
 
-  # Target for the reward function
-  reward_targets:
-    # The ideal average node connectivity we want the agent to achieve
-    target_connectivity: 3.5
-    # How much tolerance we allow around the target
-    connectivity_tolerance: 0.2
+# --- 2. Model Selection: Choose the simulation engine ---
+model_selection:
+  # Model 'A': Original graph-based model (deprecated)
+  # Model 'B': Kinetics-driven ODE model
+  model: 'B'
 
-# --- Reinforcement Learning Agent Parameters ---
-agent:
-  # State and action dimensions for the neural network
-  state_dim: 6  # [Lchain, Nchain, time, dose_rate, avg_connectivity, l2_eigenvalue]
-  action_dim: 4 # Relative changes to [Lchain, Nchain, time, dose_rate]
-  max_action: 0.2 # Agent can change a parameter by a maximum of +/- 20% per step
-
-  # TD3 Algorithm Hyperparameters (to be tuned by Optuna)
-  gamma: 0.99       # Discount factor for future rewards
-  tau: 0.005        # Target network update rate
-  policy_noise: 0.2   # Noise added to target policy during critic update
-  noise_clip: 0.5     # Range to clip target policy noise
-  policy_freq: 2      # Frequency of delayed policy updates
-
-# --- Training and Optimization Parameters ---
-training:
-  # Optuna Hyperparameter Search
+# --- 3. RL Hyperparameters: SAC agent and training loop ---
+rl_hyperparameters:
+  learning_rate: 3e-4
+  buffer_size: 1000000
+  batch_size: 256
+  gamma:
+    default: 0.99
+    min: 0.9
+    max: 0.999
+  tau:
+    default: 0.005
+    min: 0.001
+    max: 0.02
+  alpha:
+    default: 0.2
+    min: 0.1
+    max: 0.3
+  max_action: 1.0 # Maximum absolute value for actions (e.g., for scaling tanh output)
+  state_dim: 4 # Dimension of the observation space (e.g., [avg_chain_len, avg_crosslink_density, avg_scission_density, laplacian_l2])
+  action_dim: 1 # Dimension of the action space (e.g., change in dose rate)
+  network_architecture:
+    actor: [256, 256]  # Hidden layers
+    critic: [256, 256] # Hidden layers
+  # Optuna settings
   enable_optuna: true
-  optuna_trials: 100  # Number of hyperparameter sets to test
+  optuna_trials: 100
+  episodes: 1000 # Number of episodes per trial
+  checkpoint_frequency: 50 # Save agent state every X episodes
 
-  # Main Training Loop
-  episodes: 500
-  batch_size: 128
-  
-  # Penalty for actions to encourage efficiency
-  action_cost_penalty: 0.05 # Penalty factor for the magnitude of the action
+# --- 4. Physics Parameters: Constants for the simulation model ---
+physics_parameters:
+  # Parameters for Model B (Kinetics-Driven)
+  # Can be defined inline or as a path to a separate file
+  kinetic_rate_constants_path: "kinetic_params.yaml"
+  initial_concentrations:
+    PE: 22.7
+    O2: 0.009
+    PE_rad: 0.0
+    PEOO_rad: 0.0
+    PEOOH: 0.0
+    PEOOPE: 0.0
+    PECOOH: 0.0
+  grid_dimensions: [10, 10, 10]
+  voxel_size: 1.0 # nm
+  simulation_box_size: [10.0, 10.0, 10.0] # nm (should be grid_dimensions * voxel_size)
+  time_step: 3600 # s
 
-# --- File and Directory Paths ---
-paths:
-  # Central database for logging all simulation results
-  database_file: "simulation_results.db"
-  # Directory to save trained RL models
-  model_dir: "models"
-  # Directory for saving plots
-  plot_dir: "plots"
-
+# --- 5. Output Paths: Where to save results ---
+output_paths:
+  database_path: "results/simulation_data.db"
+  plot_path: "results/plots/"
+  model_path: "results/models/"
