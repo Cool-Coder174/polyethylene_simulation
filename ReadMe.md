@@ -34,6 +34,7 @@ It's like conducting thousands of lab experiments in code, uncovering the secret
 * Python 3.8+
 * `venv` or `conda` environment manager (recommended)
 * Git (for cloning the repository)
+* NVIDIA CUDA Toolkit (required for GPU-accelerated features and tests, install via `conda install cudatoolkit` or NVIDIA's official instructions)
 
 ### Installation
 
