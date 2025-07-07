@@ -1,3 +1,4 @@
 polyethylene_env/
 *.swp
 polyethylene_simulation_backup/
+tests_out/
