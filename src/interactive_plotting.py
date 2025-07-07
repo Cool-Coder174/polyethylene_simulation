@@ -7,7 +7,7 @@ species concentrations and reaction rates over time.
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from src.database import fetch_data_for_plotting # Updated import path
+from .database import fetch_data_for_plotting # Updated to relative import
 
 def create_interactive_plots(db_path: Path, output_dir: Path, run_id: str):
     """
