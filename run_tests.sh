@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #SBATCH --job-name=polyethylene_test
 #SBATCH --partition=kamiak
 #SBATCH --time=00:10:00
@@ -10,7 +10,9 @@
 #SBATCH --output=tests_out/test_results_%j.out
 #SBATCH --error=tests_out/test_errors_%j.err
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=i.hernandez-domingu@wsu.edu # Please replace with your email
+#SBATCH --mail-user=${EMAIL} # Please replace with your email
+
+export EMAIL=i.hernandez-domingu@wsu.edu
 
 echo "Starting test run at $(date)"
 
