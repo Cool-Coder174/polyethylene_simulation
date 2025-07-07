@@ -1,0 +1,13 @@
+openmm
+scipy
+pandas
+plotly
+networkx
+pyyaml
+torch
+optuna
+pytest
+numba
+psutil
+py3nvml
+numpy
