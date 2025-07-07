@@ -56,10 +56,13 @@ def objective(trial: optuna.trial.Trial) -> float:
     run_id = str(uuid.uuid4()) # Generate a unique ID for this simulation run
     start_time = datetime.now() # Record the start time of the trial
     status = "running" # Initial status of the run
-    initial_dose_rate = None # Initialize, will be set after env reset
     final_reward = 0.0 # Initialize final reward
 
-    # Log run metadata at the start of the trial. This helps track ongoing runs.
+    # Initialize the environment and reset it to get initial metadata
+    env = PolymerSimulationEnv(config)
+    initial_dose_rate = env.reset() # Reset environment and get initial dose rate
+
+    # Log run metadata after environment reset to ensure accurate initialization
     log_run_metadata(db_path, {
         "run_id": run_id,
         "optuna_trial_id": trial.number, # Optuna's unique trial number
