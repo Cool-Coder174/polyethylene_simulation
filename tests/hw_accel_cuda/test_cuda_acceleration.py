@@ -62,10 +62,10 @@ def test_cuda_kernel_correctness_and_performance(size):
     cpu_after, ram_after = measure_cpu_ram()
 
     # Validate resource usage jump
-    assert gpu_after >= max(gpu_before + 10, 30), f"Low GPU usage: {gpu_after}%"
-    assert mem_after >= max(mem_before + 5, 20), f"Low GPU memory usage: {mem_after}%"
-    assert cpu_after >= max(cpu_before + 5, 20), f"Low CPU usage: {cpu_after}%"
-    assert ram_after >= max(ram_before + 5, 20), f"Low RAM usage: {ram_after}%"
+    assert gpu_after >= max(gpu_before + gpu_threshold, 30), f"Low GPU usage: {gpu_after}%"
+    assert mem_after >= max(mem_before + mem_threshold, 20), f"Low GPU memory usage: {mem_after}%"
+    assert cpu_after >= max(cpu_before + cpu_threshold, 20), f"Low CPU usage: {cpu_after}%"
+    assert ram_after >= max(ram_before + ram_threshold, 20), f"Low RAM usage: {ram_after}%"
 
     # Compare to CPU-only run
     start_cpu = time.time()
