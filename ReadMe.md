@@ -186,6 +186,40 @@ squeue -u your_username
 
 ---
 
+## 🔬 Ab-Initio Rate Constant Calculation (Advanced)
+
+To reduce reliance on empirical data, this project includes a framework for calculating key kinetic rate constants from first-principles molecular dynamics simulations.
+
+### Workflow
+
+1.  **MD System Setup (`scripts/setup_md_system.py`)**:
+    *   This script uses `OpenMM` to build a small, amorphous polyethylene simulation cell.
+    *   It parameterizes the system using the OPLS-AA force field.
+    *   It performs energy minimization and a short NPT equilibration to achieve a realistic density.
+    *   The final, equilibrated system is saved to `data/equilibrated_pe_system.pdb` and `data/equilibrated_pe_system.xml`.
+
+2.  **Reactive MD Simulation (`scripts/run_reactive_md.py`)**:
+    *   This script provides a scaffold for running a reactive QM/MM (Quantum Mechanics/Molecular Mechanics) simulation.
+    *   **Note**: This script uses **placeholder** values for activation energies, as it requires an external QM engine.
+    *   It calculates rate constants for crosslinking and scission from activation energies using the Eyring equation.
+    *   The final calculated constants are saved to `models/ab_initio_params.json`.
+
+### How to Use
+
+1.  **Generate the equilibrated system**:
+    ```bash
+    python scripts/setup_md_system.py
+    ```
+
+2.  **Run the reactive simulation (with placeholders)**:
+    ```bash
+    python scripts/run_reactive_md.py
+    ```
+
+3.  **For a real calculation**: You will need to modify `scripts/run_reactive_md.py` to interface with your chosen QM/MM engine inside the `calculate_activation_energy_qmmm` function.
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions to the Intelligent Polymer Degradation Simulator! Here's how you can help:
