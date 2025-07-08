@@ -25,7 +25,7 @@ class PolymerSimulationEnv:
     The environment models the polymer as a collection of voxels, each undergoing
     chemical reactions, and a graph representing the polymer chains.
     """
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, scission_model_path: str = None):
         """
         Initializes the Polymer Simulation Environment.
 
@@ -33,8 +33,11 @@ class PolymerSimulationEnv:
             config (dict): A dictionary containing configuration parameters for
                            the simulation, including physics parameters, run parameters,
                            and RL hyperparameters.
+            scission_model_path (str, optional): Path to the scission model JSON file.
+                                                 If None, defaults to "models/scission_equation.json".
         """
         self.config = config
+        self.scission_model_path = scission_model_path
         
         # Load kinetic rate constants from a separate YAML file.
         # This allows for easy modification of reaction rates without changing code.
@@ -60,17 +63,18 @@ class PolymerSimulationEnv:
 
     def _load_scission_model(self):
         """Loads the symbolic scission model from the JSON file."""
+        path = self.scission_model_path or "models/scission_equation.json"
         try:
-            with open("models/scission_equation.json", 'r') as f:
+            with open(path, 'r') as f:
                 scission_model = json.load(f)
             
             sympy_expr = sympy.sympify(scission_model['sympy_expr'])
             # Sort symbols by name to ensure consistent order for lambdify
             self.scission_symbols = tuple(sorted(sympy_expr.free_symbols, key=lambda s: str(s)))
             self.scission_function = sympy.lambdify(self.scission_symbols, sympy_expr, 'numpy')
-            print("Successfully loaded symbolic scission model.")
+            print(f"Successfully loaded symbolic scission model from {path}.")
         except FileNotFoundError:
-            print("Warning: scission_equation.json not found. Using fallback scission model.")
+            print(f"Warning: Scission model at '{path}' not found. Using fallback scission model.")
             self.scission_function = None
 
     def _load_experimental_data(self):
