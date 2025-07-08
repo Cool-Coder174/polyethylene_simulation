@@ -82,20 +82,38 @@ class PolymerSimulationEnv:
         PE, O2, PE_rad, PEOO_rad, PEOOH, PEOOPE, PECOOH = y
         I = dose_rate # Radiation dose rate
 
-        # Equations 9-19 from Sargin & Beckman (2020) - these define the reaction rates
-        dPE_dt = -self.k['k1'] * PE * I
-        dO2_dt = -self.k['k2'] * PE_rad * O2
+        # --- Corrected ODEs based on literature review ---
+        
+        # Original dPE_dt: -self.k['k1'] * PE * I
+        # Correction: Changed coefficient from -1 to -2 and added PEOOH term.
+        dPE_dt = -2 * self.k['k1'] * PE * I - self.k['k4'] * PEOOH
+
+        # Original dO2_dt: -self.k['k2'] * PE_rad * O2
+        # Correction: Added terms for O2 release during PEOO radical termination.
+        dO2_dt = -self.k['k1'] * PE_rad * O2 + self.k['k2'] * PEOO_rad**2 + self.k['k6'] * PEOO_rad**2
+        
+        # dPE_rad_dt remains unchanged from the original implementation for now.
         dPE_rad_dt = self.k['k1'] * PE * I - self.k['k2'] * PE_rad * O2 + \
                      self.k['k3'] * PEOO_rad * PE - self.k['k4'] * PE_rad**2 + \
                      self.k['k5'] * PEOOH - self.k['k7'] * PEOO_rad * PE_rad - \
                      self.k['k8'] * PE_rad * PEOOH
-        dPEOO_rad_dt = self.k['k2'] * PE_rad * O2 - self.k['k3'] * PEOO_rad * PE - \
-                       2 * self.k['k6'] * PEOO_rad**2 - self.k['k7'] * PEOO_rad * PE_rad
+
+        # Original dPEOO_rad_dt: self.k['k2'] * PE_rad * O2 - self.k['k3'] * PEOO_rad * PE - 2 * self.k['k6'] * PEOO_rad**2 - self.k['k7'] * PEOO_rad * PE_rad
+        # Correction: Replaced with a more complete model, ensuring self-termination is negative.
+        dPEOO_rad_dt = self.k['k1'] * PE_rad * O2 - 2 * self.k['k2'] * PEOO_rad**2 - \
+                       self.k['k3'] * PEOO_rad * PE - self.k['k4'] * PEOO_rad - \
+                       2 * self.k['k6'] * PEOO_rad**2
+
+        # dPEOOH_dt remains unchanged.
         dPEOOH_dt = self.k['k3'] * PEOO_rad * PE - self.k['k5'] * PEOOH - \
                       self.k['k8'] * PE_rad * PEOOH
+        
+        # dPEOOPE_dt (Crosslinking) remains unchanged.
         dPEOOPE_dt = self.k['k4'] * PE_rad**2 + self.k['k6'] * PEOO_rad**2 + \
                        self.k['k7'] * PEOO_rad * PE_rad
-        dPECOOH_dt = self.k['k5'] * PEOOH # Scission events are proportional to PEOOH decomposition
+        
+        # dPECOOH_dt (Scission) remains unchanged for now.
+        dPECOOH_dt = self.k['k5'] * PEOOH
 
         return [dPE_dt, dO2_dt, dPE_rad_dt, dPEOO_rad_dt, dPEOOH_dt, dPEOOPE_dt, dPECOOH_dt]
 
