@@ -121,250 +121,204 @@ class Actor(nn.Module):
 
 class Critic(nn.Module):
     """
-    The Critic network for the SAC agent. It consists of two Q-networks (Q1 and Q2)
-    to mitigate overestimation bias in Q-value estimation.
-
-    Each Q-network takes a state-action pair as input and outputs a single Q-value.
+    The Distributional Critic network for the DSAC agent. It outputs a discrete
+    distribution over Q-values instead of a single value.
     """
-    def __init__(self, state_dim: int, action_dim: int, hidden_dims: list[int]):
+    def __init__(self, state_dim: int, action_dim: int, hidden_dims: list[int], n_atoms: int, v_min: float, v_max: float):
         """
-        Initializes the Critic network.
+        Initializes the Distributional Critic network.
 
         Args:
-            state_dim (int): The dimensionality of the input state space.
-            action_dim (int): The dimensionality of the input action space.
-            hidden_dims (list[int]): A list specifying the number of neurons in each
-                                     hidden layer for both Q-networks.
+            state_dim (int): Dimensionality of the state space.
+            action_dim (int): Dimensionality of the action space.
+            hidden_dims (list[int]): Neurons in each hidden layer.
+            n_atoms (int): Number of atoms for the discrete distribution.
+            v_min (float): Minimum value of the Q-value support.
+            v_max (float): Maximum value of the Q-value support.
         """
         super().__init__()
-        # Q1 architecture: Takes concatenated state and action as input.
+        self.n_atoms = n_atoms
+        self.v_min = v_min
+        self.v_max = v_max
+        
+        # Define the support of the distribution (the discrete Q-values).
+        self.support = torch.linspace(v_min, v_max, n_atoms).to(device)
+
+        # Q1 architecture
         self.l1 = nn.Linear(state_dim + action_dim, hidden_dims[0])
         self.l2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.l3 = nn.Linear(hidden_dims[1], 1) # Output a single Q-value
+        self.l3 = nn.Linear(hidden_dims[1], n_atoms)
 
-        # Q2 architecture: Identical to Q1, but with separate weights.
+        # Q2 architecture
         self.l4 = nn.Linear(state_dim + action_dim, hidden_dims[0])
         self.l5 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.l6 = nn.Linear(hidden_dims[1], 1)
+        self.l6 = nn.Linear(hidden_dims[1], n_atoms)
 
     def forward(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Performs a forward pass through both Q1 and Q2 networks.
-
-        Args:
-            state (torch.Tensor): The input state tensor.
-            action (torch.Tensor): The input action tensor.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: A tuple containing the Q-values from Q1 and Q2.
-        """
-        # Concatenate state and action tensors to form the input for the Q-networks.
-        sa = torch.cat([state, action], 1)
-
-        # Forward pass for Q1 network.
-        q1 = F.relu(self.l1(sa))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)
-
-        # Forward pass for Q2 network.
-        q2 = F.relu(self.l4(sa))
-        q2 = F.relu(self.l5(q2))
-        q2 = self.l6(q2)
-        return q1, q2
-
-    def Q1(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        """
-        Performs a forward pass only through the Q1 network.
-
-        Args:
-            state (torch.Tensor): The input state tensor.
-            action (torch.Tensor): The input action tensor.
-
-        Returns:
-            torch.Tensor: The Q-value from the Q1 network.
+        Returns the logits of the Q-value distributions.
         """
         sa = torch.cat([state, action], 1)
-        q1 = F.relu(self.l1(sa))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)
-        return q1
+        
+        x = F.relu(self.l1(sa))
+        x = F.relu(self.l2(x))
+        q1_logits = self.l3(x)
+
+        x = F.relu(self.l4(sa))
+        x = F.relu(self.l5(x))
+        q2_logits = self.l6(x)
+        
+        return q1_logits, q2_logits
+
+    def get_probs(self, state: torch.Tensor, action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Returns the probabilities of the Q-value distributions (after softmax).
+        """
+        q1_logits, q2_logits = self.forward(state, action)
+        q1_probs = F.softmax(q1_logits, dim=-1)
+        q2_probs = F.softmax(q2_logits, dim=-1)
+        return q1_probs, q2_probs
+
 
 
 class SAC:
     """
-    Implementation of the Soft Actor-Critic (SAC) algorithm.
-
-    This class manages the actor and critic networks, their optimizers,
-    target networks, and the training process for the SAC agent.
+    Implementation of the Distributional Soft Actor-Critic (DSAC) algorithm.
     """
     def __init__(self, config: dict):
         """
-        Initializes the SAC agent.
-
-        Args:
-            config (dict): A dictionary containing hyperparameters for the SAC algorithm,
-                           including gamma, tau, learning rates, network architectures, etc.
+        Initializes the DSAC agent.
         """
-        # Extract hyperparameters from the configuration dictionary.
-        self.gamma = config['rl_hyperparameters']['gamma'] # Discount factor for future rewards
-        self.tau = config['rl_hyperparameters']['tau']     # Soft update coefficient for target networks
-        self.alpha = config['rl_hyperparameters']['alpha'] # Entropy regularization coefficient
-        self.max_action = config['rl_hyperparameters']['max_action'] # Max action value for scaling
-        self.auto_entropy_tuning = True # Flag to enable/disable automatic entropy tuning
+        self.gamma = config['rl_hyperparameters']['gamma']
+        self.tau = config['rl_hyperparameters']['tau']
+        self.alpha = config['rl_hyperparameters']['alpha']
+        self.max_action = config['rl_hyperparameters']['max_action']
+        self.auto_entropy_tuning = True
 
-        # Get state and action dimensions from config.
         state_dim = config['rl_hyperparameters']['state_dim']
         action_dim = config['rl_hyperparameters']['action_dim']
-        # Get network hidden layer dimensions.
         actor_hidden_dims = config['rl_hyperparameters']['network_architecture']['actor']
         critic_hidden_dims = config['rl_hyperparameters']['network_architecture']['critic']
+        
+        # DSAC specific hyperparameters
+        self.n_atoms = config['rl_hyperparameters']['num_atoms']
+        self.v_min = config['rl_hyperparameters']['v_min']
+        self.v_max = config['rl_hyperparameters']['v_max']
 
-        # Initialize Actor network and its optimizer.
         self.actor = Actor(state_dim, action_dim, self.max_action, actor_hidden_dims).to(device)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=config['rl_hyperparameters']['learning_rate'])
 
-        # Initialize Critic network and its target network.
-        self.critic = Critic(state_dim, action_dim, critic_hidden_dims).to(device)
-        self.critic_target = copy.deepcopy(self.critic) # Target critic is a copy of the main critic
+        self.critic = Critic(state_dim, action_dim, critic_hidden_dims, self.n_atoms, self.v_min, self.v_max).to(device)
+        self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=config['rl_hyperparameters']['learning_rate'])
 
-        # Initialize components for automatic entropy tuning if enabled.
         if self.auto_entropy_tuning:
-            # Target entropy is typically set to -action_dim.
             self.target_entropy = -torch.prod(torch.Tensor(action_dim).to(device)).item()
-            # log_alpha is optimized instead of alpha directly for stability.
             self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
             self.alpha_optimizer = optim.Adam([self.log_alpha], lr=config['rl_hyperparameters']['learning_rate'])
 
-        self.total_it = 0 # Counter for total training iterations
+        self.total_it = 0
 
     def select_action(self, state: np.ndarray) -> np.ndarray:
-        """
-        Selects an action based on the current policy for a given state.
-
-        This method is used during environment interaction (e.g., in `train.py`)
-        to get an action from the actor network.
-
-        Args:
-            state (np.ndarray): The current state observation from the environment.
-
-        Returns:
-            np.ndarray: The selected action, scaled to the environment's action space.
-        """
-        # Convert the numpy state array to a PyTorch tensor and move to the correct device.
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        # Sample an action from the actor's distribution (log_pi is not needed here).
         action, _ = self.actor.sample(state)
-        # Convert the action tensor back to a numpy array and flatten it.
         return action.cpu().data.numpy().flatten()
 
     def train(self, replay_buffer, batch_size: int):
-        """
-        Performs one training step for the SAC agent.
+        self.total_it += 1
 
-        This involves:
-        1. Sampling a batch of experiences from the replay buffer.
-        2. Updating the Critic networks (Q1 and Q2).
-        3. Updating the Actor network.
-        4. Updating the entropy regularization coefficient (alpha) if auto-tuning is enabled.
-        5. Soft-updating the target Critic networks.
-
-        Args:
-            replay_buffer: An instance of the ReplayBuffer containing past experiences.
-            batch_size (int): The number of experiences to sample for this training step.
-        """
-        self.total_it += 1 # Increment total training iterations counter
-
-        # Sample a batch of transitions from the replay buffer.
         state, next_state, action, reward, done = replay_buffer.sample(batch_size)
         
-        # Convert numpy arrays to PyTorch tensors and move them to the appropriate device.
         state = torch.FloatTensor(state).to(device)
         next_state = torch.FloatTensor(next_state).to(device)
         action = torch.FloatTensor(action).to(device)
-        # Reshape reward and done tensors to have a dimension of 1 for broadcasting.
         reward = torch.FloatTensor(reward).unsqueeze(1).to(device)
         done = torch.FloatTensor(done).unsqueeze(1).to(device)
 
-        # --- Update Critic Networks (Q-functions) ---
-        with torch.no_grad(): # Operations within this block do not track gradients
-            # Sample next actions and their log probabilities from the current actor policy.
+        # --- Update Critic Networks ---
+        with torch.no_grad():
             next_action, next_log_pi = self.actor.sample(next_state)
-            # Get Q-values from the target critic networks for the next state-action pair.
-            target_Q1, target_Q2 = self.critic_target(next_state, next_action)
-            # Take the minimum of the two target Q-values to mitigate overestimation bias.
-            # Subtract alpha * next_log_pi for entropy regularization.
-            target_Q = torch.min(target_Q1, target_Q2) - self.alpha * next_log_pi
-            # Compute the target Q-value using the Bellman equation.
-            # (1 - done) handles terminal states (done=True means no future reward).
-            target_Q = reward + (1 - done) * self.gamma * target_Q
+            
+            # Get target Q-value distribution
+            next_q1_probs, next_q2_probs = self.critic_target.get_probs(next_state, next_action)
+            
+            # Use the minimum of the two expected Q-values to select the distribution
+            next_q1_expected = (next_q1_probs * self.critic.support).sum(dim=1, keepdim=True)
+            next_q2_expected = (next_q2_probs * self.critic.support).sum(dim=1, keepdim=True)
+            min_next_q_probs = torch.where(next_q1_expected < next_q2_expected, next_q1_probs, next_q2_probs)
 
-        # Get current Q-values from the main critic networks for the current state-action pair.
-        current_Q1, current_Q2 = self.critic(state, action)
+            # Apply entropy regularization to the expected Q-value
+            target_Q_expected = torch.min(next_q1_expected, next_q2_expected) - self.alpha * next_log_pi
+            
+            # Project the target distribution
+            target_support = reward + (1 - done) * self.gamma * self.critic.support.unsqueeze(0)
+            
+            # Clamp the target support to be within [v_min, v_max]
+            target_support = torch.clamp(target_support, self.v_min, self.v_max)
 
-        # Compute the critic loss using Mean Squared Error (MSE) between current and target Q-values.
-        critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
-        # Zero gradients, perform backpropagation, and update critic network weights.
+            # Distribute probabilities
+            delta_z = (self.v_max - self.v_min) / (self.n_atoms - 1)
+            b = (target_support - self.v_min) / delta_z
+            l = b.floor().long()
+            u = b.ceil().long()
+
+            # Handle cases where l and u are the same
+            l[(u > 0) * (l == u)] -= 1
+            u[(l < (self.n_atoms - 1)) * (l == u)] += 1
+            
+            target_dist = torch.zeros_like(min_next_q_probs)
+            offset = torch.linspace(0, (batch_size - 1) * self.n_atoms, batch_size).long().unsqueeze(1).to(device)
+            
+            target_dist.view(-1).index_add_(0, (l + offset).view(-1), (min_next_q_probs * (u.float() - b)).view(-1))
+            target_dist.view(-1).index_add_(0, (u + offset).view(-1), (min_next_q_probs * (b - l.float())).view(-1))
+
+        # Get current Q-value distributions
+        current_q1_logits, current_q2_logits = self.critic(state, action)
+        
+        # Critic loss is the cross-entropy between the current and target distributions
+        critic_loss = - (target_dist * F.log_softmax(current_q1_logits, dim=1)).sum(dim=1).mean() - \
+                      (target_dist * F.log_softmax(current_q2_logits, dim=1)).sum(dim=1).mean()
+
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        # --- Update Actor Network (Policy) ---
-        # Sample actions and their log probabilities from the current actor policy.
+        # --- Update Actor Network ---
         pi, log_pi = self.actor.sample(state)
-        # Get Q-values from the main critic networks for the sampled actions.
-        qf1_pi, qf2_pi = self.critic(state, pi)
-        # Take the minimum of the two Q-values.
-        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        q1_probs, q2_probs = self.critic.get_probs(state, pi)
+        
+        q1_expected = (q1_probs * self.critic.support).sum(dim=1, keepdim=True)
+        q2_expected = (q2_probs * self.critic.support).sum(dim=1, keepdim=True)
+        min_q_expected = torch.min(q1_expected, q2_expected)
 
-        # Compute the actor loss. This aims to maximize Q-values while also maximizing entropy.
-        # The negative sign is because optimizers minimize loss, but we want to maximize reward/entropy.
-        actor_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
-        # Zero gradients, perform backpropagation, and update actor network weights.
+        actor_loss = ((self.alpha * log_pi) - min_q_expected).mean()
+
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
-        # --- Update Entropy Regularization Coefficient (Alpha) ---
+        # --- Update Alpha ---
         if self.auto_entropy_tuning:
-            # Compute the loss for alpha. This aims to drive the entropy towards a target entropy.
             alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
-            # Zero gradients, perform backpropagation, and update alpha.
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.alpha_optimizer.step()
-            # Update the actual alpha value from its log version.
             self.alpha = self.log_alpha.exp()
 
-        # --- Soft Update Target Critic Networks ---
-        # Update the target critic network weights using a soft update (polyak averaging).
-        # This slowly moves the target network towards the main network, stabilizing training.
+        # --- Soft Update Target Networks ---
         for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
     def save(self, filename: str):
-        """
-        Saves the state dictionaries of the actor, critic, and log_alpha (if auto-tuning).
-
-        Args:
-            filename (str): The base filename to use for saving the models.
-                            (e.g., "model" will save "model_actor.pth", "model_critic.pth").
-        """
         torch.save(self.actor.state_dict(), str(filename) + "_actor.pth")
         torch.save(self.critic.state_dict(), str(filename) + "_critic.pth")
         if self.auto_entropy_tuning:
             torch.save(self.log_alpha, str(filename) + "_log_alpha.pth")
 
     def load(self, filename: str):
-        """
-        Loads the state dictionaries for the actor, critic, and log_alpha (if auto-tuning).
-
-        Args:
-            filename (str): The base filename from which to load the models.
-        """
         self.actor.load_state_dict(torch.load(str(filename) + "_actor.pth"))
         self.critic.load_state_dict(torch.load(str(filename) + "_critic.pth"))
-        # After loading the critic, ensure the target critic is an exact copy.
         self.critic_target = copy.deepcopy(self.critic)
         if self.auto_entropy_tuning:
             self.log_alpha = torch.load(str(filename) + "_log_alpha.pth")
