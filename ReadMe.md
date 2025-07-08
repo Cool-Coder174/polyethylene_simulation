@@ -109,114 +109,114 @@ This is a closed-loop learning system. The SAC agent interacts with a gym-like e
 
 *   `config.yaml` — Central configuration file for all parameters.
 *   `kinetic_params.yaml` — Defines kinetic rate constants for the chemical model.
-*   `data/` — Contains initial polymer chain data (`polyethylene_chain.pdb`) and related information.
-*   `models/` — Directory for saving trained agent models (actor and critic weights).
-*   `results/` — Output directory for simulation data (`simulation_data.db`), plots, and saved models.
-*   `src/` — Contains all Python source code:
-    *   `src/train.py` — Main script for running training loops and Optuna hyperparameter tuning.
-    *   `src/polymer_env.py` — Gym-compatible physics simulation environment.
-    *   `src/sac_agent.py` — Implementation of the Soft Actor-Critic (SAC) algorithm.
-    *   `src/replay_buffer.py` — Manages the experience replay buffer for the RL agent.
-    *   `src/database.py` — Handles SQLite database interactions for data logging.
-    *   `src/interactive_plotting.py` — Generates interactive Plotly visualizations from simulation data.
-    *   `src/test_environment.py` — Unit tests for the `polymer_env.py` physics and reward models.
+*   `data/` — Contains initial polymer chain data (`polyethylene_chain.pdb`).
+*   `models/` — Directory for saving trained agent models and discovered symbolic equations.
+*   `results/` — Output directory for simulation data, plots, and saved models.
+*   `scripts/` — Contains helper and discovery scripts.
+    *   `discover_scission_model.py` — Uses symbolic regression (PySR) to find a scission rate equation.
+*   `src/` — Contains all Python source code for the simulation and RL agent.
+    *   `fine_tune_model.py` — **Main entry point.** Orchestrates the entire workflow.
+    *   `train.py` — Legacy training script with Optuna support.
+    *   `polymer_env.py` — Gym-compatible physics simulation environment.
+    *   `sac_agent.py` — Implementation of the Distributional Soft Actor-Critic (DSAC) algorithm.
+    *   `replay_buffer.py` — Manages the experience replay buffer.
+    *   `database.py` — Handles SQLite database interactions.
+    *   `interactive_plotting.py` — Generates interactive visualizations.
+*   `submit_kamiak_job.sh` — Script for submitting the fine-tuning job to a SLURM-based HPC.
 
-### 🧠 Reinforcement Learning Loop
+### 🧠 Reinforcement Learning Loop (Parameter Tuning)
 
-*   **State (S)** — 4D vector:
-    `[avg_chain_len, avg_crosslink_density, avg_scission_density, laplacian_l2]`
-    (Note: The previous 6D state was simplified to these key macroscopic properties for the RL agent.)
+The RL loop is designed to fine-tune two key parameters of the kinetic model: a multiplier for the crosslinking rate and a multiplier for the scission rate.
 
-*   **Action (A)** — 1D vector:
-    `[Δ% dose_rate]`
-    (The agent controls the relative change in radiation dose rate.)
+*   **State (S)** — 2D vector:
+    `[crosslink_multiplier, scission_multiplier]`
 
-*   **Reward (R)**:
+*   **Action (A)** — 2D vector:
+    `[Δ_crosslink_multiplier, Δ_scission_multiplier]`
+    (The agent suggests a multiplicative change to the current multipliers.)
 
-    ```math
-    R_{quality} = 100 * e^{-k \cdot \max(0, |C_{final} - C_{target}| - \epsilon)}
-    ```
-
-    *   `C_final`: Current average crosslink density.
-    *   `C_target`: Target crosslink density.
-    *   `ε`: Tolerance for the target.
-    *   `k`: Scaling factor (e.g., 5).
-
-*   **Penalties**: (Currently not explicitly defined in `polymer_env.py` but can be added)
-
-    *   `P_action`: L2 norm penalty on actions (to discourage erratic behavior).
-    *   `P_time`: Penalty based on simulation runtime (to encourage efficiency).
-
-*   **Total Reward**:
+*   **Reward (R)**: The reward is the negative mean squared error between the logarithm of the predicted and true scission-to-crosslink ratios, calculated over high and low dose-rate simulations.
 
     ```math
-    R_{total} = R_{quality} - P_{action} - P_{time}
+R = - \frac{1}{N} \sum_{i=1}^{N} \left( \log\left(\frac{S_{pred}}{C_{pred}}\right)_i - \log\left(\frac{S_{true}}{C_{true}}\right)_i \right)^2
     ```
 
-### 🔍 Hyperparameter Optimization
-
-`src/train.py` uses Optuna to:
-
-*   Search hyperparameters (learning rate, gamma, tau, alpha, etc.)
-*   Prune bad trials early to save computational resources.
-*   Log performance metrics for each trial.
+*   **Episode Termination**: Each episode consists of a single step. The agent proposes a set of multipliers, the environment runs the full simulation for both dose rates, calculates the reward, and terminates.
 
 ---
 
-## 🧪 For Physicists & Material Scientists
+## 🔬 Hybrid Symbolic-RL Modeling
 
-### 🧬 Graph-Based Polymer Model
+This project implements a novel hybrid modeling approach that combines symbolic regression with deep reinforcement learning to create a more accurate and physically realistic model of polyethylene degradation.
 
-Polyethylene is modeled as a graph `G = (V, E)`:
+### Workflow
 
-*   **Nodes (V):** Monomer units
-*   **Edges (E):** Covalent bonds
-*   Placed in a 3D periodic box simulating an amorphous material
+1.  **Symbolic Regression for Scission Rate (`scripts/discover_scission_model.py`)**:
+    *   The workflow begins by analyzing experimental data for polymer chain scission.
+    *   It uses the `pysr` library to perform symbolic regression, searching for a simple mathematical formula that describes the rate of chain scission as a function of radiation dose rate and time.
+    *   The best-fit equation is saved to `models/scission_equation.json`.
 
-### ⏳ Degradation Dynamics
+2.  **Reinforcement Learning for Parameter Tuning (`fine_tune_model.py`)**:
+    *   The symbolic scission equation discovered in the first step is integrated into the main ODE model in `src/polymer_env.py`.
+    *   A Distributional Soft Actor-Critic (DSAC) agent is then trained to fine-tune two key parameters:
+        1.  A multiplier for the overall crosslinking rate.
+        2.  A multiplier for the newly discovered symbolic scission rate.
+    *   The agent's goal is to find multipliers that make the simulation output match experimental data for both high and low dose rates simultaneously.
 
-Simulates changes over days, driven by chemical kinetics:
+### Running the Full Workflow on an HPC (Kamiak)
 
-#### Crosslinking (P_XL):
+The combined symbolic regression and RL tuning process is computationally intensive and is best run on a High-Performance Computing (HPC) cluster.
 
-```math
-P_{XL}(t, D) = -a_{XL}(t) \cdot D^{b_{XL}(t)}
-```
+1.  **Setup your Conda Environment**: Ensure you have a Conda environment with all the necessary packages from `requirements.txt` installed. Activate it.
 
-Where:
+2.  **Submit the Job**: Use the provided SLURM script to submit the job.
+    ```bash
+sbatch submit_kamiak_job.sh
+    ```
+    This script will:
+    *   Request the necessary compute resources (CPUs, memory, time).
+    *   Load the Anaconda module and activate your environment.
+    *   Run the main `fine_tune_model.py` script.
+    *   Save SLURM output and error logs to the `slurm_output/` directory.
 
-*   `a_XL(t) = (7.324e-4)t - 1.034e-3`
-*   `b_XL(t) = (-5.631e-5)t + 1.015`
+3.  **Monitor the Job**: Check the status of your job using:
+    ```bash
+squeue -u your_username
+    ```
 
-#### Scission (P_SC):
+---
 
-```math
-P_{SC}(t, D) = a_{SC}(t) \cdot D^{b_{SC}(t)}
-```
+## 🔬 Ab-Initio Rate Constant Calculation (Advanced)
 
-Where:
+To reduce reliance on empirical data, this project includes a framework for calculating key kinetic rate constants from first-principles molecular dynamics simulations.
 
-*   `a_SC(t) = (3.385e-4)t^2 + (3.152e-2)t - 0.4905`
-*   `b_SC(t) = (1.575e-4)t + 0.5168`
+### Workflow
 
-### 🌌 Spatial & Energy Considerations
+1.  **MD System Setup (`scripts/setup_md_system.py`)**:
+    *   This script uses `OpenMM` to build a small, amorphous polyethylene simulation cell.
+    *   It parameterizes the system using the OPLS-AA force field.
+    *   It performs energy minimization and a short NPT equilibration to achieve a realistic density.
+    *   The final, equilibrated system is saved to `data/equilibrated_pe_system.pdb` and `data/equilibrated_pe_system.xml`.
 
-*   **Spatially-Aware Events**: k-d tree used to prefer nearby bonds during crosslinking.
-*   **Energy-Based Scission**: Nodes with more stress (higher degree) have higher break probability.
+2.  **Reactive MD Simulation (`scripts/run_reactive_md.py`)**:
+    *   This script provides a scaffold for running a reactive QM/MM (Quantum Mechanics/Molecular Mechanics) simulation.
+    *   **Note**: This script uses **placeholder** values for activation energies, as it requires an external QM engine.
+    *   It calculates rate constants for crosslinking and scission from activation energies using the Eyring equation.
+    *   The final calculated constants are saved to `models/ab_initio_params.json`.
 
-### 🧮 Measuring Integrity with Graph Laplacian
+### How to Use
 
-The integrity of the network is approximated by the algebraic connectivity:
+1.  **Generate the equilibrated system**:
+    ```bash
+    python scripts/setup_md_system.py
+    ```
 
-```math
-\lambda_2 = \text{Second-smallest eigenvalue of } L = D_{mat} - A
-```
+2.  **Run the reactive simulation (with placeholders)**:
+    ```bash
+    python scripts/run_reactive_md.py
+    ```
 
-Where:
-
-*   `D_mat`: Degree matrix
-*   `A`: Adjacency matrix
-*   `λ2`: Higher means more connected, stronger material
+3.  **For a real calculation**: You will need to modify `scripts/run_reactive_md.py` to interface with your chosen QM/MM engine inside the `calculate_activation_energy_qmmm` function.
 
 ---
 

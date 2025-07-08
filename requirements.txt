@@ -1,4 +1,3 @@
-openmm
 scipy
 pandas
 plotly
@@ -10,4 +9,5 @@ pytest
 numba
 psutil
 py3nvml
-numpy
+pysr
+openmm

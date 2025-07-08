@@ -1,0 +1,33 @@
+name: Python CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10"]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: Clean Python cache
+      run: |
+        find . -type d -name "__pycache__" -exec rm -r {} +
+        find . -type f -name "*.pyc" -delete
+
+    - name: Run tests
+      run: |
+        PYTHONPATH=$(pwd) pytest
