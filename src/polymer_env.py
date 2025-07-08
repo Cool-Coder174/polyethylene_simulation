@@ -65,7 +65,8 @@ class PolymerSimulationEnv:
                 scission_model = json.load(f)
             
             sympy_expr = sympy.sympify(scission_model['sympy_expr'])
-            self.scission_symbols = tuple(sympy_expr.free_symbols)
+            # Sort symbols by name to ensure consistent order for lambdify
+            self.scission_symbols = tuple(sorted(sympy_expr.free_symbols, key=lambda s: str(s)))
             self.scission_function = sympy.lambdify(self.scission_symbols, sympy_expr, 'numpy')
             print("Successfully loaded symbolic scission model.")
         except FileNotFoundError:
@@ -100,26 +101,21 @@ class PolymerSimulationEnv:
             # Fallback to original model if symbolic model not loaded
             return self.k['k5'] * self.voxel_states[:, 4] # PEOOH concentration
 
-        # The symbolic model expects features x0, x1, ...
-        # We need to map our dose_rate and t to the correct x_i
-        # Based on discover_scission_model.py, X = np.vstack([dose_rate, time]).T
-        # So, x0 is dose_rate, x1 is time.
+        # Based on discover_scission_model.py, PySR will use x0 for dose_rate and x1 for time.
+        # We create a map to provide the correct values.
+        # The order of self.scission_symbols is guaranteed by sorting them by name in _load_scission_model.
+        arg_map = {'x0': dose_rate, 'x1': t}
         
-        # Create a dictionary of the variables the symbolic function expects
-        # The symbols are ordered, so we can pass the values in the correct order.
-        # We assume the symbols from sympy are ordered as [x0, x1, ...]
-        # A more robust way would be to inspect the symbol names.
+        # Prepare arguments in the correct, sorted order for the lambdified function.
+        try:
+            args_for_call = [arg_map[str(s)] for s in self.scission_symbols]
+        except KeyError as e:
+            print(f"ERROR: Symbolic function contains an unknown variable: {e}", file=sys.stderr)
+            print(f"Expected variables are 'x0' and 'x1'. Found: {[str(s) for s in self.scission_symbols]}", file=sys.stderr)
+            # Return a safe value to prevent crashing the simulation loop.
+            return 0.0
         
-        # Let's assume the symbols are named 'x0' and 'x1' for dose_rate and time
-        args = {}
-        for sym in self.scission_symbols:
-            if str(sym) == 'x0':
-                args[sym] = dose_rate
-            elif str(sym) == 'x1':
-                args[sym] = t
-        
-        # The lambdify function takes positional arguments in the order of the symbols.
-        return self.scission_function(*[args[s] for s in self.scission_symbols])
+        return self.scission_function(*args_for_call)
 
 
     def _chemical_kinetics_ode(self, t: float, y: list, dose_rate: float, multipliers: np.ndarray) -> list:
