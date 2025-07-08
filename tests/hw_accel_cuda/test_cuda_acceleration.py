@@ -2,12 +2,24 @@ import time
 import numpy as np
 import psutil
 import pytest
-from numba import cuda
 from py3nvml import py3nvml
 
-# Initialize NVML once
-py3nvml.nvmlInit()
-gpu_handle = py3nvml.nvmlDeviceGetHandleByIndex(0)
+# Try to initialize NVML and skip all tests in this module if it fails
+try:
+    py3nvml.nvmlInit()
+    NVML_AVAILABLE = True
+except py3nvml.NVMLError_LibraryNotFound:
+    NVML_AVAILABLE = False
+
+pytest.mark.skipif(not NVML_AVAILABLE, reason="NVML library not found, skipping CUDA tests.")
+
+# Try to import Numba and get GPU handle
+try:
+    from numba import cuda
+    gpu_handle = py3nvml.nvmlDeviceGetHandleByIndex(0)
+    NUMBA_AVAILABLE = True
+except (ImportError, py3nvml.NVMLError):
+    NUMBA_AVAILABLE = False
 
 # Simple CUDA kernel: elementwise square
 @cuda.jit
@@ -25,6 +37,7 @@ def measure_cpu_ram():
     mem = psutil.virtual_memory().percent
     return cpu, mem
 
+@pytest.mark.skipif(not NUMBA_AVAILABLE, reason="Numba not available")
 @pytest.mark.parametrize("size", [1<<20, 1<<22])
 def test_cuda_kernel_correctness_and_performance(size):
     # Prepare data
@@ -60,6 +73,12 @@ def test_cuda_kernel_correctness_and_performance(size):
     # Measure utilization after run
     gpu_after, mem_after = measure_gpu_utilization()
     cpu_after, ram_after = measure_cpu_ram()
+
+    # Define thresholds for resource usage jump
+    gpu_threshold = 10
+    mem_threshold = 5
+    cpu_threshold = 5
+    ram_threshold = 1
 
     # Validate resource usage jump
     assert gpu_after >= max(gpu_before + gpu_threshold, 30), f"Low GPU usage: {gpu_after}%"
