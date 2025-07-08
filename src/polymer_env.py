@@ -95,7 +95,7 @@ class PolymerSimulationEnv:
             0.0108: {'time': time_hr, 'scission': scission_low_dose, 'crosslink': crosslink_low_dose}
         }
 
-    def evaluate_scission_equation(self, dose_rate, t):
+    def evaluate_scission_equation(self, dose_rate, t, PEOOH):
         """
         Evaluates the symbolic scission rate equation.
         The symbolic regression was performed on (dose_rate, time) but the model might have
@@ -103,7 +103,7 @@ class PolymerSimulationEnv:
         """
         if self.scission_function is None:
             # Fallback to original model if symbolic model not loaded
-            return self.k['k5'] * self.voxel_states[:, 4] # PEOOH concentration
+            return self.k['k5'] * PEOOH
 
         # Based on discover_scission_model.py, PySR will use x0 for dose_rate and x1 for time.
         # We create a map to provide the correct values.
@@ -158,7 +158,7 @@ class PolymerSimulationEnv:
                        self.k['k7'] * PEOO_rad * PE_rad) * crosslink_multiplier
         
         # Apply RL-tuned multiplier to the symbolic scission rate
-        scission_rate = self.evaluate_scission_equation(dose_rate, t)
+        scission_rate = self.evaluate_scission_equation(dose_rate, t, PEOOH)
         dPECOOH_dt = scission_rate * scission_multiplier
 
         return [dPE_dt, dO2_dt, dPE_rad_dt, dPEOO_rad_dt, dPEOOH_dt, dPEOOPE_dt, dPECOOH_dt]
