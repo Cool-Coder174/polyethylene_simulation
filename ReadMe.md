@@ -1,29 +1,29 @@
 # 🧪 Intelligent Polymer Degradation Simulator
 
-A deep reinforcement learning (DRL) environment for simulating and controlling the degradation of polyethylene polymers. The agent models how plastic breaks down over time by learning the physics of chain scission and crosslinking, helping us better understand long-term material performance under radiation.
+A deep reinforcement learning (DRL) framework for simulating and optimizing the degradation of polyethylene polymers. This project uses an AI agent to learn the complex physics of polymer chain scission and crosslinking, enabling rapid prediction of long-term material performance under various conditions.
 
 ---
 
-## ⚡ TL;DR: What Is This?
+## ⚡ What Is This?
 
 Think of it like a virtual scientist. Instead of waiting decades to see how plastic degrades, this project runs fast-forward simulations with an AI that tweaks parameters to see what happens. The AI learns:
 
-* How polymers break apart or fuse together.
-* What radiation doses or chain structures lead to strong or weak materials.
-* How to predict degradation outcomes before they happen in the real world.
+*   How polymers break apart or fuse together.
+*   What radiation doses or chemical kinetics lead to strong or weak materials.
+*   How to find the optimal parameters to match real-world experimental data.
 
-It's like conducting thousands of lab experiments in code, uncovering the secret physics behind polymer aging.
+It's like conducting thousands of lab experiments in code to uncover the physics behind polymer aging.
 
 ---
 
 ## 🚀 Key Features
 
-* 🤖 **AI-Controlled Simulation:** Uses the SAC (Soft Actor-Critic) algorithm to intelligently steer the simulation toward a desired material state.
-* 🔬 **Physics-Based Modeling:** 3D spatial model of polymer chains with degradation based on physical proximity and stress.
-* ⚙️ **Automated Tuning:** Hyperparameter optimization with Optuna ensures peak agent performance.
-* 📊 **Data Logging:** Results from every simulation run are stored in a robust SQLite database.
-* 🌐 **Interactive Charts:** Explore results with Plotly-powered visualizations.
-* 🧪 **Modular Code:** Cleanly separated components and unit-tested physics logic make it easy to expand.
+*   🤖 **AI-Controlled Simulation:** Employs a Soft Actor-Critic (SAC) agent to intelligently tune simulation parameters.
+*   🔬 **Hybrid Physics Modeling:** Combines a kinetics-driven ODE model with symbolic regression to discover and refine physical equations.
+*   ⚙️ **Automated Hyperparameter Tuning:** Integrated with **Optuna** for efficient optimization of the RL agent.
+*   📊 **Robust Data Logging:** Stores all simulation results and metadata in a structured **SQLite** database.
+*   🌐 **Interactive Visualization:** Generates interactive plots with **Plotly** to explore simulation outcomes.
+*   HPC **Ready:** Includes scripts and guides for running computationally intensive jobs on a SLURM-based cluster.
 
 ---
 
@@ -31,10 +31,9 @@ It's like conducting thousands of lab experiments in code, uncovering the secret
 
 ### Prerequisites
 
-* Python 3.8+
-* `venv` or `conda` environment manager (recommended)
-* Git (for cloning the repository)
-* NVIDIA CUDA Toolkit (required for GPU-accelerated features and tests, install via `conda install cudatoolkit` or NVIDIA's official instructions)
+*   Python 3.8+
+*   A virtual environment manager (`venv` or `conda`)
+*   Git
 
 ### Installation
 
@@ -45,107 +44,62 @@ It's like conducting thousands of lab experiments in code, uncovering the secret
     ```
 
 2.  **Create and activate a virtual environment:**
+    ```bash
+    # Using venv
+    python3 -m venv venv
+    source venv/bin/activate
 
-    *   **Linux/macOS:**
-        ```bash
-        python3 -m venv venv
-        source venv/bin/activate
-        ```
-    *   **Windows (Command Prompt):**
-        ```cmd
-        python -m venv venv
-        venv\Scripts\activate.bat
-        ```
-    *   **Windows (PowerShell):**
-        ```powershell
-        python -m venv venv
-        .\venv\Scripts\Activate.ps1
-        ```
+    # Or using conda
+    conda create -n polymer_sim python=3.9
+    conda activate polymer_sim
+    ```
 
 3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
-    Alternatively, you can use the provided installation script:
+    Or use the provided shell script:
     ```bash
     bash install_dependencies.sh
     ```
 
-### Running the Simulation
-
-To run the simulation and train the reinforcement learning agent, use the `train.py` script located in the `src/` directory.
-
-#### On Linux/macOS:
-
-```bash
-cd polyethylene_simulation
-source venv/bin/activate
-python src/train.py
-```
-
-#### On Windows (Command Prompt):
-
-```cmd
-cd polyethylene_simulation
-venv\Scripts\activate.bat
-python src/train.py
-```
-
-#### On Windows (PowerShell):
-
-```powershell
-cd polyethylene_simulation
-.\venv\Scripts\Activate.ps1
-python src/train.py
-```
-
 ---
+## 📖 Usage
 
-## 👨‍💻 For Software Engineers
+### Configuration
 
-This is a closed-loop learning system. The SAC agent interacts with a gym-like environment to learn how to control a dynamic degradation simulation.
+*   **`config.yaml`**: The main configuration file. Adjust run parameters, RL hyperparameters, and output paths here.
+*   **`kinetic_params.yaml`**: Defines the kinetic rate constants for the chemical ODE model.
 
-### 🧩 Project Architecture
+### Training the Agent
 
-*   `config.yaml` — Central configuration file for all parameters.
-*   `kinetic_params.yaml` — Defines kinetic rate constants for the chemical model.
-*   `data/` — Contains initial polymer chain data (`polyethylene_chain.pdb`).
-*   `models/` — Directory for saving trained agent models and discovered symbolic equations.
-*   `results/` — Output directory for simulation data, plots, and saved models.
-*   `scripts/` — Contains helper and discovery scripts.
-    *   `discover_scission_model.py` — Uses symbolic regression (PySR) to find a scission rate equation.
-*   `src/` — Contains all Python source code for the simulation and RL agent.
-    *   `fine_tune_model.py` — **Main entry point.** Orchestrates the entire workflow.
-    *   `train.py` — Legacy training script with Optuna support.
-    *   `polymer_env.py` — Gym-compatible physics simulation environment.
-    *   `sac_agent.py` — Implementation of the Distributional Soft Actor-Critic (DSAC) algorithm.
-    *   `replay_buffer.py` — Manages the experience replay buffer.
-    *   `database.py` — Handles SQLite database interactions.
-    *   `interactive_plotting.py` — Generates interactive visualizations.
-*   `submit_kamiak_job.sh` — Script for submitting the fine-tuning job to a SLURM-based HPC.
+The primary script for training the agent is `src/train.py`. You can run it in two modes, controlled by the `enable_optuna` flag in `config.yaml`.
 
-### 🧠 Reinforcement Learning Loop (Parameter Tuning)
-
-The RL loop is designed to fine-tune two key parameters of the kinetic model: a multiplier for the crosslinking rate and a multiplier for the scission rate.
-
-*   **State (S)** — 2D vector:
-    `[crosslink_multiplier, scission_multiplier]`
-
-*   **Action (A)** — 2D vector:
-    `[Δ_crosslink_multiplier, Δ_scission_multiplier]`
-    (The agent suggests a multiplicative change to the current multipliers.)
-
-*   **Reward (R)**: The reward is the negative mean squared error between the logarithm of the predicted and true scission-to-crosslink ratios, calculated over high and low dose-rate simulations.
-
-    ```math
-R = - \frac{1}{N} \sum_{i=1}^{N} \left( \log\left(\frac{S_{pred}}{C_{pred}}\right)_i - \log\left(\frac{S_{true}}{C_{true}}\right)_i \right)^2
+*   **Single Run (Optuna Disabled):**
+    To run a single training session with the hyperparameters defined in `config.yaml`:
+    ```bash
+    python src/train.py
     ```
 
-*   **Episode Termination**: Each episode consists of a single step. The agent proposes a set of multipliers, the environment runs the full simulation for both dose rates, calculates the reward, and terminates.
+*   **Hyperparameter Optimization (Optuna Enabled):**
+    To launch an Optuna study that searches for the best hyperparameters:
+    ```bash
+    python src/train.py
+    ```
+    The study will run for `optuna_trials` as specified in the config file.
+
+### Visualizing Results
+
+After running a simulation, you can generate interactive plots from the data stored in the database.
+
+```bash
+python src/interactive_plotting.py
+```
+The plots will be saved in the directory specified by `plot_path` in `config.yaml`.
 
 ---
 
-## 🔬 Hybrid Symbolic-RL Modeling
+## 🧠 Hybrid Symbolic-RL Modeling
 
 This project implements a novel hybrid modeling approach that combines symbolic regression with deep reinforcement learning to create a more accurate and physically realistic model of polyethylene degradation.
 
@@ -153,131 +107,103 @@ This project implements a novel hybrid modeling approach that combines symbolic 
 
 1.  **Symbolic Regression for Scission Rate (`scripts/discover_scission_model.py`)**:
     *   The workflow begins by analyzing experimental data for polymer chain scission.
-    *   It uses the `pysr` library to perform symbolic regression, searching for a simple mathematical formula that describes the rate of chain scission as a function of radiation dose rate and time.
-    *   The best-fit equation is saved to `models/scission_equation.json`.
+    *   It uses the `pysr` library to perform symbolic regression, searching for a simple mathematical formula that describes the rate of chain scission.
+    *   The best-fit equation is saved and integrated into the main ODE model in `src/polymer_env.py`.
 
-2.  **Reinforcement Learning for Parameter Tuning (`fine_tune_model.py`)**:
-    *   The symbolic scission equation discovered in the first step is integrated into the main ODE model in `src/polymer_env.py`.
-    *   A Distributional Soft Actor-Critic (DSAC) agent is then trained to fine-tune two key parameters:
+2.  **Reinforcement Learning for Parameter Tuning (`src/train.py`)**:
+    *   A Soft Actor-Critic (SAC) agent is trained to fine-tune two key parameters of the simulation:
         1.  A multiplier for the overall crosslinking rate.
         2.  A multiplier for the newly discovered symbolic scission rate.
     *   The agent's goal is to find multipliers that make the simulation output match experimental data for both high and low dose rates simultaneously.
 
-### Running the Full Workflow on an HPC (Kamiak)
+### Reinforcement Learning Loop
 
-The combined symbolic regression and RL tuning process is computationally intensive and is best run on a High-Performance Computing (HPC) cluster.
+*   **State (S)** — 2D vector: `[crosslink_multiplier, scission_multiplier]`
+    The state represents the current multipliers applied to the kinetic rates.
 
-1.  **Setup your Conda Environment**: Ensure you have a Conda environment with all the necessary packages from `requirements.txt` installed. Activate it.
+*   **Action (A)** — 2D vector: `[Δ_crosslink_multiplier, Δ_scission_multiplier]`
+    The agent suggests a multiplicative change to the current multipliers.
 
-2.  **Submit the Job**: Use the provided SLURM script to submit the job.
-    ```bash
-sbatch submit_kamiak_job.sh
+*   **Reward (R)**: The reward is the negative mean squared error between the logarithm of the predicted and true scission-to-crosslink ratios, calculated over high and low dose-rate simulations.
+    ```math
+    R = - \frac{1}{N} \sum_{i=1}^{N} \left( \log\left(\frac{S_{pred}}{C_{pred}}\right)_i - \log\left(\frac{S_{true}}{C_{true}}\right)_i \right)^2
     ```
-    This script will:
-    *   Request the necessary compute resources (CPUs, memory, time).
-    *   Load the Anaconda module and activate your environment.
-    *   Run the main `fine_tune_model.py` script.
-    *   Save SLURM output and error logs to the `slurm_output/` directory.
 
-3.  **Monitor the Job**: Check the status of your job using:
-    ```bash
-squeue -u your_username
-    ```
+*   **Episode Termination**: Each episode consists of a single step. The agent proposes a set of multipliers, the environment runs the full simulation for both dose rates, calculates the reward, and terminates.
 
 ---
 
-## 🔬 Ab-Initio Rate Constant Calculation (Advanced)
+## 💻 Running on an HPC (Kamiak)
 
-To reduce reliance on empirical data, this project includes a framework for calculating key kinetic rate constants from first-principles molecular dynamics simulations.
+For large-scale experiments, it is recommended to run the simulation on a High-Performance Computing (HPC) cluster.
 
-### Workflow
+1.  **Configure the Job:** Modify the `submit_kamiak_job.sh` script to set your desired resources (time, memory, etc.).
 
-1.  **MD System Setup (`scripts/setup_md_system.py`)**:
-    *   This script uses `OpenMM` to build a small, amorphous polyethylene simulation cell.
-    *   It parameterizes the system using the OPLS-AA force field.
-    *   It performs energy minimization and a short NPT equilibration to achieve a realistic density.
-    *   The final, equilibrated system is saved to `data/equilibrated_pe_system.pdb` and `data/equilibrated_pe_system.xml`.
-
-2.  **Reactive MD Simulation (`scripts/run_reactive_md.py`)**:
-    *   This script provides a scaffold for running a reactive QM/MM (Quantum Mechanics/Molecular Mechanics) simulation.
-    *   **Note**: This script uses **placeholder** values for activation energies, as it requires an external QM engine.
-    *   It calculates rate constants for crosslinking and scission from activation energies using the Eyring equation.
-    *   The final calculated constants are saved to `models/ab_initio_params.json`.
-
-### How to Use
-
-1.  **Generate the equilibrated system**:
+2.  **Submit the Job:**
     ```bash
-    python scripts/setup_md_system.py
+    sbatch submit_kamiak_job.sh
+    ```
+    This script handles loading the necessary modules, activating the environment, and running `src/train.py`.
+
+3.  **Monitor the Job:** Check the status of your submitted job using its ID.
+    ```bash
+    squeue -u your_username
     ```
 
-2.  **Run the reactive simulation (with placeholders)**:
-    ```bash
-    python scripts/run_reactive_md.py
-    ```
+For a more detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
 
-3.  **For a real calculation**: You will need to modify `scripts/run_reactive_md.py` to interface with your chosen QM/MM engine inside the `calculate_activation_energy_qmmm` function.
+---
+
+## 📂 Project Structure
+
+```
+/
+├── main.py                     # Orchestrator script for the full workflow
+├── config.yaml                 # Main configuration file
+├── kinetic_params.yaml         # Kinetic parameters for the ODE model
+├── requirements.txt            # Python package dependencies
+├── install_dependencies.sh     # Installation script
+├── submit_kamiak_job.sh        # SLURM job submission script
+├── KamiakGuide.md              # User guide for the Kamiak HPC
+├── ReadMe.md                   # This file
+│
+├── data/
+│   └── polyethylene_chain.pdb  # Initial polymer structure data
+│
+├── models/                     # Directory for saved model artifacts
+│
+├── results/                    # Default output directory for DB, plots, and models
+│
+├── src/
+│   ├── train.py                # Main training script (RL tuning)
+│   ├── polymer_env.py          # Gym-like simulation environment
+│   ├── sac_agent.py            # Soft Actor-Critic agent implementation
+│   ├── replay_buffer.py        # Replay buffer for the agent
+��   ├── database.py             # SQLite database handling
+│   └── interactive_plotting.py # Script for generating result plots
+│
+├── scripts/
+│   ├── discover_scission_model.py # Symbolic regression for scission rate
+│   └── ...                     # Other utility and setup scripts
+│
+└── tests/
+    └── ...                     # Unit and integration tests
+```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions to the Intelligent Polymer Degradation Simulator! Here's how you can help:
+Contributions are welcome! Please feel free to open an issue or submit a pull request.
 
-### Reporting Bugs
-
-If you find a bug, please open an issue on the [GitHub repository](https://github.com/Cool-Coder174/polyethylene_simulation/issues). Provide a clear and concise description of the bug, steps to reproduce it, and your environment details.
-
-### Suggesting Enhancements
-
-Had an idea for a new feature or an improvement? Open an issue on the [GitHub repository](https://github.com/Cool-Coder174/polyethylene_simulation/issues) and describe your suggestion.
-
-### Making Code Contributions
-
-1.  **Fork the repository:** Click the "Fork" button on the top right of the [GitHub repository](https://github.com/Cool-Coder174/polyethylene_simulation).
-2.  **Clone your forked repository:**
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/polyethylene_simulation.git
-    cd polyethylene_simulation
-    ```
-3.  **Create a new branch:**
-    ```bash
-    git checkout -b feature/your-feature-name
-    ```
-    (or `bugfix/your-bugfix-name` for bug fixes)
-4.  **Make your changes:** Implement your feature or bug fix. Ensure your code adheres to the existing style and conventions.
-5.  **Write/Update tests:** If you're adding new functionality, please write unit tests. If you're fixing a bug, add a test that reproduces the bug and verifies the fix.
-6.  **Run tests and linting:** Before committing, ensure all tests pass and your code is lint-free.
-    ```bash
-    # (Assuming you have activated your virtual environment)
-    python -m pytest src/test_environment.py # Or run all tests if more exist
-    # Add linting command here if applicable (e.g., flake8, black, ruff)
-    ```
-7.  **Commit your changes:** Write a clear and concise commit message.
-    ```bash
-    git commit -m "feat: Add new feature"
-    # or "fix: Resolve bug in X"
-    ```
-8.  **Push to your fork:**
-    ```bash
-    git push origin feature/your-feature-name
-    ```
-9.  **Open a Pull Request:** Go to your forked repository on GitHub and open a pull request to the `main` branch of the original repository. Provide a detailed description of your changes.
-
----
-
-## 📬 Contact
-
-Maintained by [@Cool-Coder174](https://github.com/Cool-Coder174). Pull requests, issues, and collaborations welcome!
-
----
-
-## 🧠 Inspiration
-
-Inspired by scientific computing, polymer physics, and reinforcement learning research, this simulator bridges chemistry and AI to accelerate materials science.
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/your-feature`).
+3.  Commit your changes (`git commit -m 'feat: Add some feature'`).
+4.  Push to the branch (`git push origin feature/your-feature`).
+5.  Open a pull request.
 
 ---
 
 ## 📜 License
 
-[MIT License](LICENSE)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
