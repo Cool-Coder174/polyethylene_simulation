@@ -106,13 +106,19 @@ The plots will be saved in the directory specified by `plot_path` in `config.yam
 For large-scale experiments, it is recommended to run the simulation on a High-Performance Computing (HPC) cluster.
 
 1.  **Configure the Job:** Modify the `submit_kamiak_job.sh` script to set your desired resources (time, memory, etc.).
+
 2.  **Submit the Job:**
     ```bash
     sbatch submit_kamiak_job.sh
     ```
     This script handles loading the necessary modules, activating the environment, and running `src/train.py`.
 
-For a detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
+3.  **Monitor the Job:** Check the status of your submitted job using its ID.
+    ```bash
+    squeue -u your_username
+    ```
+
+For a more detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
 
 ---
 
