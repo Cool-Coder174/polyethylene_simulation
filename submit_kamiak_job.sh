@@ -20,8 +20,12 @@ echo "Job ID: $SLURM_JOBID"
 # --- Environment Setup ---
 # Load necessary modules. Use Anaconda for managing Python dependencies.
 module load anaconda3
+
+# Initialize Conda for shell interaction
+eval "$(conda shell.bash hook)"
+
 # Replace 'your_conda_env_name' with the name of your actual Conda environment
-source activate polyethylene_simulation 
+conda activate polyethylene_simulation 
 
 # --- Run the main script ---
 # The srun command executes the script on the allocated compute node
