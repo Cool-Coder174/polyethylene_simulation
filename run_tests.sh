@@ -20,6 +20,9 @@ echo "Starting test run at $(date)"
 module purge
 module load StdEnv
 module load python3/3.9.5 cuda/12.2.0
+export LD_LIBRARY_PATH=$HOME/plugins/libffi:$LD_LIBRARY_PATH
+export CPATH=$HOME/plugins/libffi/include:$CPATH
+export LD_LIBRARY_PATH=/opt/apps/cuda/12.2.0/gcc/6.1.0/nvvm/lib64:$LD_LIBRARY_PATH
 
 # Create and activate virtual environment
 VENV_DIR=~/venvs/polyethylene
@@ -32,7 +35,7 @@ pip install -r requirements.txt
 
 # Run tests
 echo "Running pytest..."
-python -m pytest tests/
+$VENV_DIR/bin/python -m pytest tests/
 
 
 echo "Test run finished at $(date)"
