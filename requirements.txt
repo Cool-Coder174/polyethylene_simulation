@@ -11,3 +11,4 @@ numba
 psutil
 py3nvml
 numpypysr
+openmm
