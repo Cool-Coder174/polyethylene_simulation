@@ -10,6 +10,7 @@ import json
 import numpy as np
 from pathlib import Path
 import subprocess
+import sys
 
 from src.polymer_env import PolymerSimulationEnv
 from src.sac_agent import SAC
@@ -26,8 +27,8 @@ def fine_tune_model():
     # This command will instantiate a Julia project environment for PySR.
     # It's better to run this once manually, but we include it here for automation.
     try:
-        subprocess.run(["python", "-c", "import pysr; pysr.install()"], check=True)
-        subprocess.run(["python", "scripts/discover_scission_model.py"], check=True)
+        subprocess.run([sys.executable, "-c", "import pysr; pysr.install()"], check=True)
+        subprocess.run([sys.executable, "scripts/discover_scission_model.py"], check=True)
         print("Symbolic regression complete. Scission model saved.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"Error during symbolic regression: {e}")
