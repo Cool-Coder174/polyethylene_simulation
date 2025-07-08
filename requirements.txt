@@ -10,4 +10,4 @@ pytest
 numba
 psutil
 py3nvml
-numpy
+numpypysr
