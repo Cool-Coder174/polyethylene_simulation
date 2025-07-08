@@ -23,6 +23,11 @@ jobs:
         pip install -r requirements.txt
         pip install pytest
 
+    - name: Clean Python cache
+      run: |
+        find . -type d -name "__pycache__" -exec rm -r {} +
+        find . -type f -name "*.pyc" -delete
+
     - name: Run tests
       run: |
         PYTHONPATH=$(pwd) pytest
