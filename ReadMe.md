@@ -158,6 +158,7 @@ For a more detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
 
 ```
 /
+├── main.py                     # Orchestrator script for the full workflow
 ├── config.yaml                 # Main configuration file
 ├── kinetic_params.yaml         # Kinetic parameters for the ODE model
 ├── requirements.txt            # Python package dependencies
@@ -174,11 +175,11 @@ For a more detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
 ├── results/                    # Default output directory for DB, plots, and models
 │
 ├── src/
-│   ├── train.py                # Main training script (entry point)
+│   ├── train.py                # Main training script (RL tuning)
 │   ├── polymer_env.py          # Gym-like simulation environment
 │   ├── sac_agent.py            # Soft Actor-Critic agent implementation
 │   ├── replay_buffer.py        # Replay buffer for the agent
-│   ├── database.py             # SQLite database handling
+��   ├── database.py             # SQLite database handling
 │   └── interactive_plotting.py # Script for generating result plots
 │
 ├── scripts/
