@@ -4,6 +4,18 @@ A deep reinforcement learning (DRL) framework for simulating and optimizing the 
 
 ---
 
+## ⚡ What Is This?
+
+Think of it like a virtual scientist. Instead of waiting decades to see how plastic degrades, this project runs fast-forward simulations with an AI that tweaks parameters to see what happens. The AI learns:
+
+*   How polymers break apart or fuse together.
+*   What radiation doses or chemical kinetics lead to strong or weak materials.
+*   How to find the optimal parameters to match real-world experimental data.
+
+It's like conducting thousands of lab experiments in code to uncover the physics behind polymer aging.
+
+---
+
 ## 🚀 Key Features
 
 *   🤖 **AI-Controlled Simulation:** Employs a Soft Actor-Critic (SAC) agent to intelligently tune simulation parameters.
@@ -11,19 +23,7 @@ A deep reinforcement learning (DRL) framework for simulating and optimizing the 
 *   ⚙️ **Automated Hyperparameter Tuning:** Integrated with **Optuna** for efficient optimization of the RL agent.
 *   📊 **Robust Data Logging:** Stores all simulation results and metadata in a structured **SQLite** database.
 *   🌐 **Interactive Visualization:** Generates interactive plots with **Plotly** to explore simulation outcomes.
-*    HPC **Ready:** Includes scripts and guides for running computationally intensive jobs on a SLURM-based cluster like Kamiak.
-
----
-
-## Workflow
-
-The project follows a two-stage hybrid modeling approach:
-
-1.  **Symbolic Model Discovery (Optional):**
-    The `scripts/discover_scission_model.py` script uses symbolic regression (`pysr`) to find a mathematical equation for the polymer chain scission rate from experimental data. The resulting equation is saved and used in the simulation environment.
-
-2.  **Reinforcement Learning for Parameter Tuning:**
-    The main training script, `src/train.py`, uses a SAC agent to fine-tune the parameters of the physics simulation. The agent's goal is to adjust multipliers for the scission and crosslinking rates until the simulation's output matches ground-truth experimental data for both high and low radiation dose rates.
+*   HPC **Ready:** Includes scripts and guides for running computationally intensive jobs on a SLURM-based cluster.
 
 ---
 
@@ -55,17 +55,15 @@ The project follows a two-stage hybrid modeling approach:
     ```
 
 3.  **Install dependencies:**
-    The `install_dependencies.sh` script installs all required packages.
-    ```bash
-    bash install_dependencies.sh
-    ```
-    Alternatively, you can install them directly using pip:
     ```bash
     pip install -r requirements.txt
     ```
+    Or use the provided shell script:
+    ```bash
+    bash install_dependencies.sh
+    ```
 
 ---
-
 ## 📖 Usage
 
 ### Configuration
@@ -98,6 +96,40 @@ After running a simulation, you can generate interactive plots from the data sto
 python src/interactive_plotting.py
 ```
 The plots will be saved in the directory specified by `plot_path` in `config.yaml`.
+
+---
+
+## 🧠 Hybrid Symbolic-RL Modeling
+
+This project implements a novel hybrid modeling approach that combines symbolic regression with deep reinforcement learning to create a more accurate and physically realistic model of polyethylene degradation.
+
+### Workflow
+
+1.  **Symbolic Regression for Scission Rate (`scripts/discover_scission_model.py`)**:
+    *   The workflow begins by analyzing experimental data for polymer chain scission.
+    *   It uses the `pysr` library to perform symbolic regression, searching for a simple mathematical formula that describes the rate of chain scission.
+    *   The best-fit equation is saved and integrated into the main ODE model in `src/polymer_env.py`.
+
+2.  **Reinforcement Learning for Parameter Tuning (`src/train.py`)**:
+    *   A Soft Actor-Critic (SAC) agent is trained to fine-tune two key parameters of the simulation:
+        1.  A multiplier for the overall crosslinking rate.
+        2.  A multiplier for the newly discovered symbolic scission rate.
+    *   The agent's goal is to find multipliers that make the simulation output match experimental data for both high and low dose rates simultaneously.
+
+### Reinforcement Learning Loop
+
+*   **State (S)** — 2D vector: `[crosslink_multiplier, scission_multiplier]`
+    The state represents the current multipliers applied to the kinetic rates.
+
+*   **Action (A)** — 2D vector: `[Δ_crosslink_multiplier, Δ_scission_multiplier]`
+    The agent suggests a multiplicative change to the current multipliers.
+
+*   **Reward (R)**: The reward is the negative mean squared error between the logarithm of the predicted and true scission-to-crosslink ratios, calculated over high and low dose-rate simulations.
+    ```math
+    R = - \frac{1}{N} \sum_{i=1}^{N} \left( \log\left(\frac{S_{pred}}{C_{pred}}\right)_i - \log\left(\frac{S_{true}}{C_{true}}\right)_i \right)^2
+    ```
+
+*   **Episode Termination**: Each episode consists of a single step. The agent proposes a set of multipliers, the environment runs the full simulation for both dose rates, calculates the reward, and terminates.
 
 ---
 
