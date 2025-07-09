@@ -240,36 +240,39 @@ class SAC:
         with torch.no_grad():
             next_action, next_log_pi = self.actor.sample(next_state)
             
-            # Get target Q-value distribution
+            # Get target Q-value distributions and select the one with the minimum expected value
             next_q1_probs, next_q2_probs = self.critic_target.get_probs(next_state, next_action)
-            
-            # Use the minimum of the two expected Q-values to select the distribution
             next_q1_expected = (next_q1_probs * self.critic.support).sum(dim=1, keepdim=True)
             next_q2_expected = (next_q2_probs * self.critic.support).sum(dim=1, keepdim=True)
             min_next_q_probs = torch.where(next_q1_expected < next_q2_expected, next_q1_probs, next_q2_probs)
 
-            # Apply entropy regularization to the expected Q-value
-            target_Q_expected = torch.min(next_q1_expected, next_q2_expected) - self.alpha * next_log_pi
+            # The target distribution is based on the Bellman equation for distributional RL.
+            # We project the discounted, entropy-regularized next-state distribution onto the current support.
             
-            # Project the target distribution
-            target_support = reward + (1 - done) * self.gamma * self.critic.support.unsqueeze(0)
+            # The entropy term is subtracted from the support of the next state distribution
+            entropy_term = self.alpha * next_log_pi
+            target_support = self.critic.support.unsqueeze(0) - entropy_term.unsqueeze(2)
+            
+            # Apply Bellman update (reward + gamma * discounted_next_support)
+            target_support = reward.unsqueeze(2) + (1 - done).unsqueeze(2) * self.gamma * target_support
             
             # Clamp the target support to be within [v_min, v_max]
             target_support = torch.clamp(target_support, self.v_min, self.v_max)
 
-            # Distribute probabilities
+            # Distribute probabilities via linear interpolation (C51 projection)
             delta_z = (self.v_max - self.v_min) / (self.n_atoms - 1)
             b = (target_support - self.v_min) / delta_z
             l = b.floor().long()
             u = b.ceil().long()
 
-            # Handle cases where l and u are the same
+            # Handle edge cases where l and u are the same
             l[(u > 0) * (l == u)] -= 1
             u[(l < (self.n_atoms - 1)) * (l == u)] += 1
             
             target_dist = torch.zeros_like(min_next_q_probs)
             offset = torch.linspace(0, (batch_size - 1) * self.n_atoms, batch_size).long().unsqueeze(1).to(device)
             
+            # Project probabilities
             target_dist.view(-1).index_add_(0, (l + offset).view(-1), (min_next_q_probs * (u.float() - b)).view(-1))
             target_dist.view(-1).index_add_(0, (u + offset).view(-1), (min_next_q_probs * (b - l.float())).view(-1))
 
