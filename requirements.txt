@@ -11,3 +11,5 @@ psutil
 py3nvml
 pysr
 openmm
+gymnasium
+pyyaml
