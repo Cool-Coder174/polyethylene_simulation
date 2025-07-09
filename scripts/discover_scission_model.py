@@ -54,7 +54,7 @@ def discover_scission_model():
         model_selection="best",
         loss="L2DistLoss()",
         procs=8,
-        constrain_complexity=15,
+        constraints={'complexity': 15},
         # julia_project must be set for reproducibility
         julia_project="polyethylene_simulation_pysr"
     )
