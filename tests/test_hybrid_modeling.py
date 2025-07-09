@@ -54,7 +54,7 @@ def test_reset_method(env):
     """
     # Modify the state, then reset
     env.param_multipliers = np.array([2.0, 3.0])
-    initial_state = env.reset()
+    initial_state, info = env.reset()
     
     assert np.array_equal(initial_state, [1.0, 1.0]), "Reset should return the initial state [1.0, 1.0]."
     assert np.array_equal(env.param_multipliers, [1.0, 1.0]), "Multipliers should be reset to [1.0, 1.0]."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=polyethylene_test
+#SBATCH --job-name=polyethylene_all_tests
 #SBATCH --partition=kamiak
 #SBATCH --time=02:55:00
 #SBATCH --nodes=1
@@ -32,8 +32,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Run tests
-echo "Running pytest..."
-$VENV_DIR/bin/python -m pytest tests/
-
+echo "Running all pytest tests..."
+$VENV_DIR/bin/python -m pytest tests/ hw_accel_cuda/
 
 echo "Test run finished at $(date)"

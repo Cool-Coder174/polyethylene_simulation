@@ -176,7 +176,7 @@ class PolymerSimulationEnv(gym.Env):
         done = True  # Episode is always done after one step
         next_observation = self._get_rl_state()
         
-        return next_observation, reward, done, False, {} # New Gym API returns 5 values
+        return next_observation, reward, done, {}
 
     def _get_rl_state(self) -> np.ndarray:
         """Returns the current state for the RL agent."""
