@@ -186,7 +186,7 @@ class PolymerSimulationEnv:
         self.param_multipliers = np.clip(self.param_multipliers, 0.1, 10.0)
 
         # 2. Run full ODE simulation for each dose rate
-        predicted_data = {}
+        self.predicted_data = {}
         initial_concentrations = list(self.config['physics_parameters']['initial_concentrations'].values())
 
         for dose_rate, data in self.true_data.items():
@@ -202,13 +202,13 @@ class PolymerSimulationEnv:
                 t_eval=t_eval
             )
             
-            predicted_data[dose_rate] = {
+            self.predicted_data[dose_rate] = {
                 'scission': sol.y[-1],
                 'crosslink': sol.y[-2]
             }
 
         # 3. Calculate reward
-        reward = self._calculate_reward(predicted_data)
+        reward = self._calculate_reward(self.predicted_data)
         
         # 4. Return results
         # The episode is always done after one step in this setup.
@@ -254,3 +254,30 @@ class PolymerSimulationEnv:
         reward = -mean_squared_error
         
         return reward
+
+    def get_simulation_data_df(self) -> pd.DataFrame:
+        """
+        Returns the most recent simulation data as a pandas DataFrame.
+        This is intended to be called after a step to log the results.
+        """
+        # This is a placeholder implementation. In a real scenario, you would
+        # store the results from the last `step` call in `self` and format
+        # them here.
+        data_to_log = []
+        # Assuming self.predicted_data holds the latest simulation output
+        if hasattr(self, 'predicted_data'):
+            for dose_rate, values in self.predicted_data.items():
+                for i, time in enumerate(self.true_data[dose_rate]['time']):
+                    data_to_log.append({
+                        "run_id": "some_unique_run_id", # Placeholder
+                        "optuna_trial_id": None, # Placeholder
+                        "episode_num": 0, # Placeholder
+                        "day": time,
+                        "chain_length_avg": 0, # Placeholder
+                        "num_chains": 0, # Placeholder
+                        "avg_node_connectivity": 0, # Placeholder
+                        "crosslinking_pct": values['crosslink'][i],
+                        "scission_pct": values['scission'][i],
+                        "graph_laplacian_l2": 0 # Placeholder
+                    })
+        return pd.DataFrame(data_to_log)

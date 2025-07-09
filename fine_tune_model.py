@@ -1,9 +1,11 @@
 
+"""
 This script orchestrates the entire hybrid modeling workflow:
 1.  It runs the symbolic regression script to discover the scission model.
 2.  It fine-tunes the kinetic model's parameters using a Distributional Soft
     Actor-Critic (DSAC) agent.
 3.  It saves the final tuned parameters and validation plots.
+"""
 
 import yaml
 import json
@@ -15,6 +17,7 @@ import sys
 from src.polymer_env import PolymerSimulationEnv
 from src.sac_agent import SAC
 from src.replay_buffer import ReplayBuffer
+import src.database as db
 # Note: We will need a plotting function, let's assume one exists in interactive_plotting
 from src.interactive_plotting import create_interactive_plots
 
@@ -22,6 +25,8 @@ def fine_tune_model():
     """
     Main function to run the fine-tuning process.
     """
+    db_path = Path("simulation_results.db")
+    db.init_database(db_path)
     print("--- Phase 1: Discovering Scission Model via Symbolic Regression ---")
     # We need to ensure PySR has a Julia environment.
     # This command will instantiate a Julia project environment for PySR.
@@ -66,6 +71,9 @@ def fine_tune_model():
         if (step + 1) % 1000 == 0:
             print(f"Step: {step + 1}/{total_steps}, Reward: {reward:.4f}")
             print(f"  Current Multipliers: {env.param_multipliers}")
+            # Log data to database
+            log_df = env.get_simulation_data_df()
+            db.log_simulation_data(db_path, log_df)
 
     print("Training complete.")
 
@@ -81,6 +89,20 @@ def fine_tune_model():
     with open(models_dir / "param_multipliers.json", 'w') as f:
         json.dump(final_multipliers, f, indent=4)
     print(f"Final multipliers saved to {models_dir / 'param_multipliers.json'}")
+
+    # Log final metadata
+    # This is a placeholder for what you'd actually log
+    metadata = {
+        "run_id": "some_unique_run_id", # You'd generate a unique ID here
+        "optuna_trial_id": None,
+        "episode_num": 0,
+        "start_time": "start_time_placeholder",
+        "end_time": "end_time_placeholder",
+        "duration_seconds": 0, # You'd calculate this
+        "initial_params": "initial_params_placeholder",
+        "final_reward": reward
+    }
+    db.log_run_metadata(db_path, metadata)
 
     # Run a final validation simulation with the tuned parameters
     # This part is illustrative. A dedicated validation function would be better.
