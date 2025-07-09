@@ -74,3 +74,10 @@ output_paths:
   database_path: "results/simulation_data.db"
   plot_path: "results/plots/"
   model_path: "results/models/"
+
+# --- 6. Script Paths: Locations of executable scripts ---
+script_paths:
+  md_setup: "scripts/setup_md_system.py"
+  symbolic_regression: "scripts/discover_scission_model.py"
+  reactive_md: "scripts/run_reactive_md.py"
+  rl_fine_tuning: "fine_tune_model.py"
