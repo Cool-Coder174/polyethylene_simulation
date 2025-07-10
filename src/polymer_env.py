@@ -214,15 +214,15 @@ class PolymerSimulationEnv(gym.Env):
             for dose_rate, values in self.predicted_data.items():
                 for i, time in enumerate(self.true_data[dose_rate]['time_hr']):
                     data_to_log.append({
-                        "run_id": "some_unique_run_id", # Placeholder
-                        "optuna_trial_id": None, # Placeholder
-                        "episode_num": 0, # Placeholder
+                        "run_id": self.run_id,
+                        "optuna_trial_id": self.optuna_trial_id,
+                        "episode_num": self.episode_num,
                         "day": time,
-                        "chain_length_avg": 0, # Placeholder
-                        "num_chains": 0, # Placeholder
-                        "avg_node_connectivity": 0, # Placeholder
+                        "chain_length_avg": self.chain_length_avg,
+                        "num_chains": self.num_chains,
+                        "avg_node_connectivity": self.avg_node_connectivity,
                         "crosslinking_pct": values['crosslink'][i],
                         "scission_pct": values['scission'][i],
-                        "graph_laplacian_l2": 0 # Placeholder
+                        "graph_laplacian_l2": self.graph_laplacian_l2
                     })
         return pd.DataFrame(data_to_log)

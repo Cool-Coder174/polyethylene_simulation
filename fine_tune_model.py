@@ -91,15 +91,22 @@ def fine_tune_model():
     print(f"Final multipliers saved to {models_dir / 'param_multipliers.json'}")
 
     # Log final metadata
-    # This is a placeholder for what you'd actually log
+    import uuid
+    from datetime import datetime
+    start_time = datetime.now()
+    
+    # Placeholder for reward calculation (ensure this is defined earlier in the code)
+    reward = env.get_final_reward()  # Replace with actual method to get final reward
+    
+    end_time = datetime.now()
     metadata = {
-        "run_id": "some_unique_run_id", # You'd generate a unique ID here
+        "run_id": str(uuid.uuid4()),  # Generate a unique ID
         "optuna_trial_id": None,
-        "episode_num": 0,
-        "start_time": "start_time_placeholder",
-        "end_time": "end_time_placeholder",
-        "duration_seconds": 0, # You'd calculate this
-        "initial_params": "initial_params_placeholder",
+        "episode_num": total_steps,  # Assuming total_steps represents the number of episodes
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "duration_seconds": (end_time - start_time).total_seconds(),
+        "initial_params": config.get("initial_params", {}),  # Replace with actual initial params
         "final_reward": reward
     }
     db.log_run_metadata(db_path, metadata)
