@@ -23,16 +23,16 @@ def get_system_info():
                                     capture_output=True, text=True, check=True)
             gpu_lines = result.stdout.strip().split('\n')
             if gpu_lines and gpu_lines[0]:
-                info["gpu_info"] = [line.strip() for line in gpu_lines]
+                info["gpu_info"] = {"present": True, "details": [line.strip() for line in gpu_lines]}
             else:
-                info["gpu_info"] = "No NVIDIA GPU detected."
+                info["gpu_info"] = {"present": False, "details": []}
         except (subprocess.CalledProcessError, FileNotFoundError):
-            info["gpu_info"] = "nvidia-smi not found or no NVIDIA GPU detected."
+            info["gpu_info"] = {"present": False, "details": []}
     elif info["os"] == "Darwin": # macOS
         # For macOS, checking for Metal/OpenCL capabilities is more complex
         # and often requires specific frameworks. For simplicity, we'll assume
         # no dedicated GPU acceleration for now unless explicitly configured.
-        info["gpu_info"] = "GPU detection for macOS is not fully implemented in this script."
+        info["gpu_info"] = {"present": False, "details": []}
 
     return info
 

@@ -60,7 +60,7 @@ def init_database(db_path: Path):
             """)
             conn.commit() # Commit the changes to create the tables
     except sqlite3.Error as e:
-        print(f"Database error in init_database: {e}")
+        logging.error(f"Database error in init_database: {e}")
         raise
 
 def log_simulation_data(db_path: Path, data_df: pd.DataFrame):
