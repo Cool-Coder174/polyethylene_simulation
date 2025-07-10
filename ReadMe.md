@@ -179,7 +179,6 @@ For a more detailed guide on using the Kamiak cluster, see `KamiakGuide.md`.
 │   ├── polymer_env.py          # Gym-like simulation environment
 │   ├── sac_agent.py            # Soft Actor-Critic agent implementation
 │   ├── replay_buffer.py        # Replay buffer for the agent
-��   ├── database.py             # SQLite database handling
 │   └── interactive_plotting.py # Script for generating result plots
 │
 ├── scripts/
