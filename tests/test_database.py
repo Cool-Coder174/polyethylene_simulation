@@ -14,11 +14,13 @@ from src.database import (
 class TestDatabase(unittest.TestCase):
     def setUp(self):
         """Set up a temporary database for testing."""
-        self.db_path = Path("test_database.db")
+        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.db_path = Path(self.temp_db.name)
         init_database(self.db_path)
 
     def tearDown(self):
         """Remove the temporary database after testing."""
+        self.temp_db.close()
         self.db_path.unlink(missing_ok=True)
 
     def test_init_database(self):
