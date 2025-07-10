@@ -1,9 +1,11 @@
 
+"""
 This script orchestrates the entire hybrid modeling workflow:
 1.  It runs the symbolic regression script to discover the scission model.
 2.  It fine-tunes the kinetic model's parameters using a Distributional Soft
     Actor-Critic (DSAC) agent.
 3.  It saves the final tuned parameters and validation plots.
+"""
 
 import yaml
 import json
@@ -15,6 +17,7 @@ import sys
 from src.polymer_env import PolymerSimulationEnv
 from src.sac_agent import SAC
 from src.replay_buffer import ReplayBuffer
+import src.database as db
 # Note: We will need a plotting function, let's assume one exists in interactive_plotting
 from src.interactive_plotting import create_interactive_plots
 
@@ -22,6 +25,8 @@ def fine_tune_model():
     """
     Main function to run the fine-tuning process.
     """
+    db_path = Path("simulation_results.db")
+    db.init_database(db_path)
     print("--- Phase 1: Discovering Scission Model via Symbolic Regression ---")
     # We need to ensure PySR has a Julia environment.
     # This command will instantiate a Julia project environment for PySR.
@@ -66,6 +71,9 @@ def fine_tune_model():
         if (step + 1) % 1000 == 0:
             print(f"Step: {step + 1}/{total_steps}, Reward: {reward:.4f}")
             print(f"  Current Multipliers: {env.param_multipliers}")
+            # Log data to database
+            log_df = env.get_simulation_data_df()
+            db.log_simulation_data(db_path, log_df)
 
     print("Training complete.")
 
@@ -81,6 +89,27 @@ def fine_tune_model():
     with open(models_dir / "param_multipliers.json", 'w') as f:
         json.dump(final_multipliers, f, indent=4)
     print(f"Final multipliers saved to {models_dir / 'param_multipliers.json'}")
+
+    # Log final metadata
+    import uuid
+    from datetime import datetime
+    start_time = datetime.now()
+    
+    # Placeholder for reward calculation (ensure this is defined earlier in the code)
+    reward = env.get_final_reward()  # Replace with actual method to get final reward
+    
+    end_time = datetime.now()
+    metadata = {
+        "run_id": str(uuid.uuid4()),  # Generate a unique ID
+        "optuna_trial_id": None,
+        "episode_num": total_steps,  # Assuming total_steps represents the number of episodes
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "duration_seconds": (end_time - start_time).total_seconds(),
+        "initial_params": config.get("initial_params", {}),  # Replace with actual initial params
+        "final_reward": reward
+    }
+    db.log_run_metadata(db_path, metadata)
 
     # Run a final validation simulation with the tuned parameters
     # This part is illustrative. A dedicated validation function would be better.

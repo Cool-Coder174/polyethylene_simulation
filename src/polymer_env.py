@@ -1,4 +1,3 @@
-
 """
 This module defines the PolymerSimulationEnv, a custom Gymnasium environment
 for simulating the degradation of polyethylene polymers. It integrates chemical kinetics
@@ -151,7 +150,7 @@ class PolymerSimulationEnv(gym.Env):
         self.param_multipliers *= np.exp(action * 0.1)
         self.param_multipliers = np.clip(self.param_multipliers, self.observation_space.low, self.observation_space.high)
 
-        predicted_data = {}
+        self.predicted_data = {}
         initial_concentrations = list(self.config['physics_parameters']['initial_concentrations'].values())
 
         for dose_rate, data in self.true_data.items():
@@ -167,16 +166,16 @@ class PolymerSimulationEnv(gym.Env):
                 t_eval=t_eval
             )
             
-            predicted_data[dose_rate] = {
+            self.predicted_data[dose_rate] = {
                 'scission': sol.y[-1],
                 'crosslink': sol.y[-2]
             }
 
-        reward = self._calculate_reward(predicted_data)
+        reward = self._calculate_reward(self.predicted_data)
         done = True  # Episode is always done after one step
         next_observation = self._get_rl_state()
         
-        return next_observation, reward, done, {}
+        return next_observation, reward, done, False, {}
 
     def _get_rl_state(self) -> np.ndarray:
         """Returns the current state for the RL agent."""
@@ -204,3 +203,26 @@ class PolymerSimulationEnv(gym.Env):
             
         mean_squared_error = total_error / num_points if num_points > 0 else 0
         return -mean_squared_error
+
+    def get_simulation_data_df(self) -> pd.DataFrame:
+        """
+        Returns the most recent simulation data as a pandas DataFrame.
+        This is intended to be called after a step to log the results.
+        """
+        data_to_log = []
+        if hasattr(self, 'predicted_data'):
+            for dose_rate, values in self.predicted_data.items():
+                for i, time in enumerate(self.true_data[dose_rate]['time_hr']):
+                    data_to_log.append({
+                        "run_id": self.run_id,
+                        "optuna_trial_id": self.optuna_trial_id,
+                        "episode_num": self.episode_num,
+                        "day": time,
+                        "chain_length_avg": self.chain_length_avg,
+                        "num_chains": self.num_chains,
+                        "avg_node_connectivity": self.avg_node_connectivity,
+                        "crosslinking_pct": values['crosslink'][i],
+                        "scission_pct": values['scission'][i],
+                        "graph_laplacian_l2": self.graph_laplacian_l2
+                    })
+        return pd.DataFrame(data_to_log)
