@@ -131,7 +131,7 @@ def fetch_data_for_plotting(db_path: Path, run_id: str = None) -> pd.DataFrame:
             df = pd.read_sql_query(query, conn, params=params)
             return df
     except sqlite3.Error as e:
-        print(f"Database error in fetch_data_for_plotting: {e}")
+        logging.error(f"Database error in fetch_data_for_plotting: {e}")
         raise
 
 def get_all_run_ids(db_path: Path) -> list[str]:
@@ -152,7 +152,7 @@ def get_all_run_ids(db_path: Path) -> list[str]:
             run_ids = [item[0] for item in cursor.fetchall()]
             return run_ids
     except sqlite3.Error as e:
-        print(f"Database error in get_all_run_ids: {e}")
+        logging.error(f"Database error in get_all_run_ids: {e}")
         raise
 
 def get_run_metadata(db_path: Path, run_id: str) -> dict:
@@ -177,5 +177,5 @@ def get_run_metadata(db_path: Path, run_id: str) -> dict:
                 return dict(row) # Convert the row object to a dictionary
             return {} # Return an empty dict if no record was found
     except sqlite3.Error as e:
-        print(f"Database error in get_run_metadata: {e}")
+        logging.error(f"Database error in get_run_metadata: {e}")
         raise
