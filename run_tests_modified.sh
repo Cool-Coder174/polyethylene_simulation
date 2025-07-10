@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=polyethylene_test
 #SBATCH --partition=kamiak
-#SBATCH --time=02:55:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
@@ -24,16 +24,19 @@ export LD_LIBRARY_PATH=/opt/apps/cuda/12.2.0/gcc/6.1.0/nvvm/lib64:$LD_LIBRARY_PA
 
 # Create and activate virtual environment
 VENV_DIR=~/venvs/polyethylene
-python3 -m venv $VENV_DIR
-source $VENV_DIR/bin/activate
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv $VENV_DIR
+    source $VENV_DIR/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+else
+    source $VENV_DIR/bin/activate
+fi
 
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
 
 # Run tests
 echo "Running pytest..."
-$VENV_DIR/bin/python -m pytest tests/
+$VENV_DIR/bin/python -m pytest -n auto tests/
 
 
 echo "Test run finished at $(date)"
