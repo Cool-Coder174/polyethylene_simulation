@@ -49,7 +49,7 @@ def run_tests_conditionally():
     test_paths.append(str(Path("tests/")))
 
     # Conditionally include GPU tests
-    if "NVIDIA GPU" in str(system_info["gpu_info"]) and "No NVIDIA GPU detected" not in str(system_info["gpu_info"]):
+    if isinstance(system_info["gpu_info"], dict) and system_info["gpu_info"].get("present", False):
         print("NVIDIA GPU detected. Including GPU acceleration tests.")
         test_paths.append(str(Path("hw_accel_cuda/")))
     else:

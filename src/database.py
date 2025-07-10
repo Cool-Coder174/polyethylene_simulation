@@ -80,7 +80,7 @@ def log_simulation_data(db_path: Path, data_df: pd.DataFrame):
             # if_exists='append' ensures new data is added without overwriting existing data.
             data_df.to_sql('simulation_data', conn, if_exists='append', index=False)
     except sqlite3.Error as e:
-        print(f"Database error in log_simulation_data: {e}")
+        logging.error(f"Database error in log_simulation_data: {e}")
         raise
 
 def log_run_metadata(db_path: Path, metadata: dict):

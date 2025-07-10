@@ -19,7 +19,7 @@ class TestDatabase(unittest.TestCase):
 
     def tearDown(self):
         """Remove the temporary database after testing."""
-        self.db_path.unlink()
+        self.db_path.unlink(missing_ok=True)
 
     def test_init_database(self):
         """Test that the database and tables are created."""
