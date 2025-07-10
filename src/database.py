@@ -103,7 +103,7 @@ def log_run_metadata(db_path: Path, metadata: dict):
             """, metadata)
             conn.commit() # Commit the changes to save the metadata
     except sqlite3.Error as e:
-        print(f"Database error in log_run_metadata: {e}")
+        logging.error(f"Database error in log_run_metadata: {e}")
         raise
 
 def fetch_data_for_plotting(db_path: Path, run_id: str = None) -> pd.DataFrame:

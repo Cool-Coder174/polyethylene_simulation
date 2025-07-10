@@ -11,7 +11,7 @@ def get_system_info():
         "os": platform.system(),
         "cpu_count": psutil.cpu_count(logical=True),
         "total_ram_gb": round(psutil.virtual_memory().total / (1024**3), 2),
-        "gpu_info": "No NVIDIA GPU detected or py3nvml not installed."
+        "gpu_info": {"present": False, "details": []}
     }
 
     if info["os"] == "Linux" or info["os"] == "Windows":
