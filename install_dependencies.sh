@@ -51,7 +51,17 @@ fi
 
 echo "Python 3 and pip3 found. Proceeding with dependency installation."
 
-# --- 3. Install Python Dependencies from requirements.txt ---
+# --- 3. Check for Julia ---
+# PySR, a dependency for symbolic regression, requires Julia to be installed.
+if ! command -v julia &> /dev/null
+then
+    echo "\nWarning: 'julia' command not found."
+    echo "PySR requires Julia. Please install it from: https://julialang.org/downloads/"
+    echo "For Linux and macOS, the recommended way is to use juliaup:"
+    echo "curl -fsSL https://install.julialang.org | sh"
+fi
+
+# --- 4. Install Python Dependencies from requirements.txt ---
 # This step installs all required Python libraries using pip.
 # The dependencies are listed in the 'requirements.txt' file.
 echo "\nInstalling Python dependencies from requirements.txt..."
@@ -67,7 +77,7 @@ else
     exit 1
 fi
 
-# --- 4. Platform-Specific Notes and Additional Considerations ---
+# --- 5. Platform-Specific Notes and Additional Considerations ---
 # Provides guidance for specific operating systems regarding common prerequisites
 # like SQLite and OpenMM with CUDA support.
 echo "\n--- Additional Setup Notes ---"

@@ -1,12 +1,14 @@
+
 """
 Main entry point for the entire polyethylene simulation and modeling workflow.
 
 This script orchestrates the following steps:
 1.  Checks for necessary external dependencies (like Julia).
-2.  Runs the molecular dynamics (MD) system setup.
-3.  Runs the symbolic regression script to discover the scission rate model.
-4.  Runs the reactive MD script to calculate ab-initio rate constants.
-5.  Runs the main reinforcement learning fine-tuning process.
+2.  Fixes the input PDB file to be compatible with OpenMM.
+3.  Runs the molecular dynamics (MD) system setup.
+4.  Runs the symbolic regression script to discover the scission rate model.
+5.  Runs the reactive MD script to calculate ab-initio rate constants.
+6.  Runs the main reinforcement learning fine-tuning process.
 """
 import subprocess
 import sys
@@ -52,6 +54,10 @@ def check_dependencies():
         )
         sys.exit(1)
     logging.info("✅ SUCCESS: All essential dependencies are found.")
+    return True
+
+from fix_pdb import fix_pdb_file
+
 
 def run_script(script_path: str, description: str, capture_output: bool = False):
     """Helper function to run an external Python script."""
@@ -100,6 +106,16 @@ def run_script(script_path: str, description: str, capture_output: bool = False)
         return False
 
 
+def run_fix_pdb_step(pdb_path):
+    """Wrapper to call the imported fix_pdb_file function."""
+    print_header("Executing Step 2: Fix PDB File")
+    try:
+        fix_pdb_file(pdb_path)
+        return True
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during PDB fix: {e}")
+        return False
+
 def main():
     """Main function to parse arguments and run the workflow."""
     parser = argparse.ArgumentParser(description="Polyethylene Simulation Workflow Orchestrator")
@@ -107,7 +123,7 @@ def main():
         "--steps",
         nargs='+',
         type=int,
-        default=list(range(1, 6)),
+        default=list(range(1, 7)),
         help="A list of steps to run (e.g., --steps 1 3 5). Default is all steps."
     )
     parser.add_argument(
@@ -124,21 +140,20 @@ def main():
     # --- Workflow Steps ---
     workflow_steps = {
         1: ("Dependencies Check", check_dependencies, {}),
-        2: ("MD System Setup", run_script, {"script_path": paths.get("md_setup"), "description": "MD System Setup", "capture_output": True}),
-        3: ("Symbolic Regression", run_script, {"script_path": paths.get("symbolic_regression"), "description": "Symbolic Regression"}),
-        4: ("Reactive MD", run_script, {"script_path": paths.get("reactive_md"), "description": "Reactive MD"}),
-        5: ("RL Fine-Tuning", run_script, {"script_path": paths.get("rl_fine_tuning"), "description": "RL Fine-Tuning"}),
+        2: ("Fix PDB File", run_fix_pdb_step, {"pdb_path": paths.get("pdb_input_path")}),
+        3: ("MD System Setup", run_script, {"script_path": paths.get("md_setup"), "description": "MD System Setup", "capture_output": True}),
+        4: ("Symbolic Regression", run_script, {"script_path": paths.get("symbolic_regression"), "description": "Symbolic Regression"}),
+        5: ("Reactive MD", run_script, {"script_path": paths.get("reactive_md"), "description": "Reactive MD"}),
+        6: ("RL Fine-Tuning", run_script, {"script_path": paths.get("rl_fine_tuning"), "description": "RL Fine-Tuning"}),
     }
 
     for step_num in sorted(args.steps):
         if step_num in workflow_steps:
             title, func, kwargs = workflow_steps[step_num]
-            print_header(f"Executing Step {step_num}: {title}")
             
-            # Special handling for dependency check which is not a script
-            if step_num == 1:
-                func()
-                continue
+            # Skip header for step 2 since it's handled in the wrapper
+            if step_num != 2:
+                print_header(f"Executing Step {step_num}: {title}")
 
             if not func(**kwargs):
                 logging.error(f"Step {step_num} failed. Aborting workflow.")

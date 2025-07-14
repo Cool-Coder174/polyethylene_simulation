@@ -26,11 +26,15 @@ def setup_md_system():
     # For OPLS-AA, we rely on OpenMM's residue templates.
     pdb = app.PDBFile(str(output_dir / 'polyethylene_chain.pdb'))
     
-    # --- 3. Setup Simulation using OPLS-AA Force Field ---
-    # OPLS-AA is a good choice for alkanes.
-    forcefield = app.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+    # --- 3. Setup Simulation using GAFF Force Field ---
+    # GAFF is a good choice for alkanes, and is included in amber14-all.xml
+    forcefield = app.ForceField('amber14-all.xml', 'pe.xml')
     
     modeller = app.Modeller(pdb.topology, pdb.positions)
+    
+    # Add missing hydrogens to the topology
+    print("Adding missing hydrogens...")
+    modeller.addHydrogens(forcefield)
     
     # Add more chains to create an amorphous cell
     # This is a simplistic packing method. More advanced tools like Packmol

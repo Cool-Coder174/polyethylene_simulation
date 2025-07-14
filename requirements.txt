@@ -13,4 +13,4 @@ py3nvml
 pysr
 openmm
 gymnasium
-pyyaml
+numpy<2.0

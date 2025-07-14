@@ -77,6 +77,7 @@ output_paths:
 
 # --- 6. Script Paths: Locations of executable scripts ---
 script_paths:
+  pdb_input_path: "data/polyethylene_chain.pdb"
   md_setup: "scripts/setup_md_system.py"
   symbolic_regression: "scripts/discover_scission_model.py"
   reactive_md: "scripts/run_reactive_md.py"
