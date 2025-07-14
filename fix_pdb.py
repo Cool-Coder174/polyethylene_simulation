@@ -63,9 +63,9 @@ def fix_pdb_file(pdb_path):
     new_atom_lines = []
     for _, row in atom_df.iterrows():
         # This formatting string ensures compliance with PDB format standards.
-        new_line = (f"{str(row['record']):<6}{int(row['serial']):>5} {str(row['name']):<4}{str(row['altLoc']):<1}{str(row['resName']):<3} {str(row['chainID']):<1}"
-                    f"{int(row['resSeq']):>4}{str(row['iCode']):<1}   {row['x']:8.3f}{row['y']:8.3f}{row['z']:8.3f}"
-                    f"{row['occupancy']:6.2f}{row['tempFactor']:6.2f}          {str(row['element']):>2}")
+        new_line = (f"{row['record']:<6}{int(row['serial']):>5} {row['name']:<4}{row['altLoc']:<1}{row['resName']:<3} {row['chainID']:<1}"
+                    f"{int(row['resSeq']):>4}{row['iCode']:<1}   {row['x']:8.3f}{row['y']:8.3f}{row['z']:8.3f}"
+                    f"{row['occupancy']:6.2f}{str(row['tempFactor']):>6}          {row['element']:>2}")
         new_atom_lines.append(new_line)
 
     # OpenMM can infer bonds, so CONECT records are not essential for this workflow.
