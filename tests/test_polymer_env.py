@@ -1,5 +1,5 @@
 """
-Tests for the PolymerSimulationEnv, including the hybrid symbolic-RL modeling components.
+Tests for the PolymerSimulationEnv, focusing on the LAMMPS integration.
 """
 import pytest
 import numpy as np
@@ -20,32 +20,15 @@ def config():
         return yaml.safe_load(f)
 
 @pytest.fixture
-def dummy_scission_model_path(tmp_path):
-    """
-    Fixture to create a dummy symbolic scission model file in a temporary directory.
-    This provides a consistent, simple model for testing purposes.
-    """
-    equation_file = tmp_path / "scission_equation.json"
-    # A simple linear equation: 0.1 * x0 + 0.01 * x1 (representing dose_rate and time)
-    equation_details = {
-        "latex": "0.1 x_{0} + 0.01 x_{1}",
-        "sympy_expr": "0.1*x0 + 0.01*x1",
-    }
-    with open(equation_file, 'w') as f:
-        json.dump(equation_details, f)
-    return str(equation_file)
-
-@pytest.fixture
-def env(config, dummy_scission_model_path):
+def env(config):
     """Fixture to create a fresh instance of the PolymerSimulationEnv for each test."""
-    return PolymerSimulationEnv(config, scission_model_path=dummy_scission_model_path)
+    return PolymerSimulationEnv(config, experimental_data_path="tests/experimental_data.json")
 
 def test_environment_initialization(env, config):
     """
     Tests if the environment initializes correctly with the given configuration.
     """
     assert env.config == config
-    assert env.scission_function is not None, "Symbolic scission function should be loaded."
     assert np.array_equal(env.param_multipliers, [1.0, 1.0]), "Initial multipliers should be [1.0, 1.0]."
 
 def test_reset_method(env):
@@ -59,22 +42,6 @@ def test_reset_method(env):
     assert np.array_equal(initial_state, [1.0, 1.0]), "Reset should return the initial state [1.0, 1.0]."
     assert np.array_equal(env.param_multipliers, [1.0, 1.0]), "Multipliers should be reset to [1.0, 1.0]."
 
-def test_scission_equation_loading_and_evaluation(env):
-    """
-    Tests that the environment can correctly load and evaluate the symbolic scission equation.
-    """
-    # Test evaluation with known values
-    dose_rate = 10.0
-    time = 100.0
-    # Expected from dummy model: 0.1 * 10.0 + 0.01 * 100.0 = 1.0 + 1.0 = 2.0
-    expected_rate = 2.0
-    
-    # The 'evaluate_scission_equation' method expects PEOOH, but the dummy model doesn't use it.
-    # We pass a dummy value for it.
-    rate = env.evaluate_scission_equation(dose_rate, time, PEOOH=0)
-    
-    assert np.isclose(rate, expected_rate, atol=1e-5)
-
 def test_step_method_and_action_effect(env):
     """
     Tests that the step method correctly applies an action, updates multipliers,
@@ -84,7 +51,7 @@ def test_step_method_and_action_effect(env):
     
     # Action should be a small multiplicative change
     action = np.array([0.1, -0.1])
-    next_state, reward, done, info = env.step(action)
+    next_state, reward, done, _, info = env.step(action)
     
     # Check if multipliers were updated correctly
     # np.exp(0.1 * 0.1) approx 1.01
@@ -102,24 +69,19 @@ def test_reward_calculation(env):
     """
     Tests the reward calculation with a known set of predicted and true data.
     """
-    # Mock predicted data
+    # Mock predicted data (since we are not running a real LAMMPS simulation in the test)
     predicted_data = {
         10.95: {'scission': np.array([0.1, 0.2]), 'crosslink': np.array([0.05, 0.1])},
         0.0108: {'scission': np.array([0.05, 0.1]), 'crosslink': np.array([0.02, 0.05])}
     }
     
-    # True ratios from the mocked data in the environment
-    # High dose: scission/crosslink -> [2.0, 2.0]
-    # Low dose: scission/crosslink -> [2.5, 2.0]
-    
-    # Predicted ratios
-    pred_ratio_high = predicted_data[10.95]['scission'] / predicted_data[10.95]['crosslink'] # -> [2.0, 2.0]
-    pred_ratio_low = predicted_data[0.0108]['scission'] / predicted_data[0.0108]['crosslink'] # -> [2.5, 2.0]
-    
     # Manually calculate expected MSE of log ratios
     true_data = env.true_data
     true_ratio_high = true_data[10.95]['scission'] / np.maximum(true_data[10.95]['crosslink'], 1e-9)
     true_ratio_low = true_data[0.0108]['scission'] / np.maximum(true_data[0.0108]['crosslink'], 1e-9)
+    
+    pred_ratio_high = predicted_data[10.95]['scission'] / predicted_data[10.95]['crosslink']
+    pred_ratio_low = predicted_data[0.0108]['scission'] / predicted_data[0.0108]['crosslink']
     
     log_error_high = np.log(pred_ratio_high) - np.log(true_ratio_high)
     log_error_low = np.log(pred_ratio_low) - np.log(true_ratio_low)

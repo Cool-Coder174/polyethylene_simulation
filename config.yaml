@@ -4,21 +4,15 @@
 # --- 1. Run Parameters: Initial conditions and goals ---
 run_parameters:
   l_chain: 100
-  n_chain: 50
-  total_simulation_time: 864000 # in seconds (e.g., 10 days)
+  n_chain: 10
+  total_simulation_time: 10000 # in timesteps
   target_properties:
     target_crosslink_density: 0.1
     crosslink_tolerance: 0.02
   param_bounds:
-    dose_rate: [0.0, 10.0] # Min and Max dose rate
+    temperature: [200.0, 400.0]
 
-# --- 2. Model Selection: Choose the simulation engine ---
-model_selection:
-  # Model 'A': Original graph-based model (deprecated)
-  # Model 'B': Kinetics-driven ODE model
-  model: 'B'
-
-# --- 3. RL Hyperparameters: SAC agent and training loop ---
+# --- 2. RL Hyperparameters: SAC agent and training loop ---
 rl_hyperparameters:
   learning_rate: 3e-4
   buffer_size: 1000000
@@ -51,33 +45,21 @@ rl_hyperparameters:
   episodes: 1000
   checkpoint_frequency: 50
 
-# --- 4. Physics Parameters: Constants for the simulation model ---
-physics_parameters:
-  # Parameters for Model B (Kinetics-Driven)
-  # Can be defined inline or as a path to a separate file
-  kinetic_rate_constants_path: "kinetic_params.yaml"
-  initial_concentrations:
-    PE: 22.7
-    O2: 0.009
-    PE_rad: 0.0
-    PEOO_rad: 0.0
-    PEOOH: 0.0
-    PEOOPE: 0.0
-    PECOOH: 0.0
-  grid_dimensions: [10, 10, 10]
-  voxel_size: 1.0 # nm
-  simulation_box_size: [10.0, 10.0, 10.0] # nm (should be grid_dimensions * voxel_size)
-  time_step: 3600 # s
+# --- 3. LAMMPS Parameters: Settings for the simulation ---
+lammps_parameters:
+  input_data_path: "data/pe_system.data"
+  input_script_path: "data/pe_system.in"
+  log_path: "data/pe_system.log"
+  executable_path: "lammps" # Assumes lammps is in the system PATH
 
-# --- 5. Output Paths: Where to save results ---
+# --- 4. Output Paths: Where to save results ---
 output_paths:
   database_path: "results/simulation_data.db"
   plot_path: "results/plots/"
   model_path: "results/models/"
 
-# --- 6. Script Paths: Locations of executable scripts ---
+# --- 5. Script Paths: Locations of executable scripts ---
 script_paths:
   md_setup: "scripts/setup_md_system.py"
-  symbolic_regression: "scripts/discover_scission_model.py"
   reactive_md: "scripts/run_reactive_md.py"
   rl_fine_tuning: "fine_tune_model.py"

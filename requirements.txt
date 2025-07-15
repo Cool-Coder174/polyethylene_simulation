@@ -11,6 +11,6 @@ numba
 psutil
 py3nvml
 pysr
-openmm
+lammps
+ase
 gymnasium
-pyyaml
