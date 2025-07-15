@@ -77,6 +77,17 @@ lammps_parameters:
   input_script_path: "data/pe_system.in"
   log_path: "data/pe_system.log"
   executable_path: "lammps" # Assumes lammps is in the system PATH
+  temp: 300.0
+  temp_damping: 100.0
+  timestep: 1.0
+  run_steps: 10000
+
+# --- 5.1. LAMMPS Force Field Parameters ---
+lammps_force_field_parameters:
+  pair_style: "lj/cut 2.5"
+  pair_coeff: "1 1 1.0 1.0 2.5"
+  bond_style: "harmonic"
+  bond_coeff: "1 100.0 1.54"
 
 # --- 6. Output Paths: Where to save results ---
 output_paths:

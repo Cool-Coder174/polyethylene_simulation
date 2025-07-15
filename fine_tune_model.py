@@ -13,54 +13,61 @@ import numpy as np
 from pathlib import Path
 import subprocess
 import sys
+import logging
+import uuid
+from datetime import datetime
 
 from src.polymer_env import PolymerSimulationEnv
 from src.sac_agent import SAC
 from src.replay_buffer import ReplayBuffer
 import src.database as db
-# Note: We will need a plotting function, let's assume one exists in interactive_plotting
 from src.interactive_plotting import create_interactive_plots
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def fine_tune_model():
     """
     Main function to run the fine-tuning process.
     """
-    db_path = Path("simulation_results.db")
+    # Load configuration
+    config_path = Path(__file__).parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    db_path = Path(config['output_paths']['database_path'])
     db.init_database(db_path)
-    print("--- Phase 1: Discovering Scission Model via Symbolic Regression ---")
-    # We need to ensure PySR has a Julia environment.
-    # This command will instantiate a Julia project environment for PySR.
-    # It's better to run this once manually, but we include it here for automation.
+    logging.info("--- Phase 1: Discovering Scission Model via Symbolic Regression ---")
     try:
         subprocess.run([sys.executable, "-c", "import pysr; pysr.install()"], check=True)
         subprocess.run([sys.executable, "scripts/discover_scission_model.py"], check=True)
-        print("Symbolic regression complete. Scission model saved.")
+        logging.info("Symbolic regression complete. Scission model saved.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Error during symbolic regression: {e}")
-        print("Please ensure Julia is installed and accessible.")
-        print("Attempting to proceed without re-running symbolic regression...")
+        logging.error(f"Error during symbolic regression: {e}")
+        logging.error("Please ensure Julia is installed and accessible.")
+        logging.info("Attempting to proceed without re-running symbolic regression...")
         if not Path("models/scission_equation.json").exists():
-            print("Error: models/scission_equation.json not found. Cannot proceed.")
+            logging.error("Error: models/scission_equation.json not found. Cannot proceed.")
             return
 
-    print("\n--- Phase 2: Fine-Tuning Parameters with Reinforcement Learning ---")
+    logging.info("\n--- Phase 2: Fine-Tuning Parameters with Reinforcement Learning ---")
     
-    # Load configuration
-    with open("config.yaml", 'r') as f:
-        config = yaml.safe_load(f)
-
     # Initialize environment, agent, and replay buffer
     env = PolymerSimulationEnv(config)
     agent = SAC(config)
     replay_buffer = ReplayBuffer()
 
-    state = env.reset()
-    total_steps = 200000
+    state, _ = env.reset()
+    total_steps = config['rl_hyperparameters']['episodes'] # Use episodes from config
     
-    print(f"Starting DSAC training for {total_steps} steps...")
+    run_id = str(uuid.uuid4())
+    start_time = datetime.now()
+    initial_dose_rate = config['run_parameters']['param_bounds']['dose_rate'][0]
+
+    logging.info(f"Starting DSAC training for {total_steps} steps...")
     for step in range(total_steps):
         action = agent.select_action(state)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, _, _ = env.step(action)
         
         replay_buffer.add(state, next_state, action, reward, float(done))
         state = next_state
@@ -68,62 +75,65 @@ def fine_tune_model():
         if len(replay_buffer.storage) > config['rl_hyperparameters']['batch_size']:
             agent.train(replay_buffer, config['rl_hyperparameters']['batch_size'])
 
-        if (step + 1) % 1000 == 0:
-            print(f"Step: {step + 1}/{total_steps}, Reward: {reward:.4f}")
-            print(f"  Current Multipliers: {env.param_multipliers}")
+        if (step + 1) % config['rl_hyperparameters']['checkpoint_frequency'] == 0:
+            logging.info(f"Step: {step + 1}/{total_steps}, Reward: {reward:.4f}")
+            logging.info(f"  Current Multipliers: {env.param_multipliers}")
+            
             # Log data to database
             log_df = env.get_simulation_data_df()
-            db.log_simulation_data(db_path, log_df)
+            if not log_df.empty:
+                # Add run_id, episode_num to the DataFrame before logging
+                log_df['run_id'] = run_id
+                log_df['episode_num'] = step + 1
+                # Add dummy values for other columns expected by simulation_data table
+                log_df['voxel_id'] = 0 # Assuming single voxel for now
+                log_df['pe_conc'] = 0.0
+                log_df['o2_conc'] = 0.0
+                log_df['pe_rad_conc'] = 0.0
+                log_df['peoo_rad_conc'] = 0.0
+                log_df['peooh_conc'] = 0.0
+                db.log_simulation_data(db_path, log_df)
 
-    print("Training complete.")
+    logging.info("Training complete.")
 
     # --- Phase 3: Save Results and Validate ---
-    print("\n--- Phase 3: Saving Final Parameters and Validation ---")
+    logging.info("\n--- Phase 3: Saving Final Parameters and Validation ---")
     
     # Save the final tuned parameter multipliers
-    final_multipliers = {"crosslink_multiplier": env.param_multipliers[0],
-                         "scission_multiplier": env.param_multipliers[1]}
+    final_multipliers = {"crosslink_multiplier": float(env.param_multipliers[0]),
+                         "scission_multiplier": float(env.param_multipliers[1])}
     
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
     with open(models_dir / "param_multipliers.json", 'w') as f:
         json.dump(final_multipliers, f, indent=4)
-    print(f"Final multipliers saved to {models_dir / 'param_multipliers.json'}")
+    logging.info(f"Final multipliers saved to {models_dir / 'param_multipliers.json'}")
 
     # Log final metadata
-    import uuid
-    from datetime import datetime
-    start_time = datetime.now()
-    
-    # Placeholder for reward calculation (ensure this is defined earlier in the code)
-    reward = env.get_final_reward()  # Replace with actual method to get final reward
-    
     end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+    
+    # Calculate final reward (assuming the last reward is representative or average over last few steps)
+    # For a single-step episode, the last reward is the final reward.
+    final_reward = reward 
+
     metadata = {
-        "run_id": str(uuid.uuid4()),  # Generate a unique ID
-        "optuna_trial_id": None,
-        "episode_num": total_steps,  # Assuming total_steps represents the number of episodes
+        "run_id": run_id,
+        "optuna_trial_id": None, # Not an Optuna run
         "start_time": start_time.isoformat(),
         "end_time": end_time.isoformat(),
-        "duration_seconds": (end_time - start_time).total_seconds(),
-        "initial_params": config.get("initial_params", {}),  # Replace with actual initial params
-        "final_reward": reward
+        "duration_seconds": duration,
+        "initial_dose_rate": initial_dose_rate,
+        "final_reward": final_reward,
+        "status": "completed"
     }
     db.log_run_metadata(db_path, metadata)
 
-    # Run a final validation simulation with the tuned parameters
-    # This part is illustrative. A dedicated validation function would be better.
-    # For now, we can re-use the logic inside the env's step function.
-    
     # Create validation plots
-    # This assumes a function `create_comparison_plots` exists and works.
-    # We will need to create it.
-    results_dir = Path("results")
-    results_dir.mkdir(exist_ok=True)
-    
-    # I will create a placeholder for the plotting function call
-    print("Validation plotting is not yet implemented.")
-    # create_interactive_plots(env.true_data, predicted_data, results_dir)
+    plot_dir = Path(config['output_paths']['plot_path'])
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    create_interactive_plots(db_path, plot_dir, run_id)
+    logging.info(f"Validation plots saved to {plot_dir}")
 
 if __name__ == "__main__":
     fine_tune_model()

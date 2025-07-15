@@ -6,6 +6,11 @@ import subprocess
 from pathlib import Path
 import re
 import json
+import yaml
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def parse_lammps_log(log_path: Path) -> dict:
     """
@@ -52,41 +57,47 @@ def run_reactive_md():
     """
     Main function to orchestrate the reactive MD simulation with LAMMPS.
     """
-    print("--- Running Reactive MD with LAMMPS ---")
+    logging.info("--- Running Reactive MD with LAMMPS ---")
     
-    # --- 1. Define Paths ---
-    lammps_in_path = Path("data/pe_system.in")
-    lammps_log_path = Path("data/pe_system.log")
+    # Load configuration
+    config_path = Path(__file__).parent.parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    # --- 1. Define Paths from config ---
+    lammps_params = config['lammps_parameters']
+    lammps_in_path = Path(lammps_params['input_script_path'])
+    lammps_log_path = Path(lammps_params['log_path'])
+    lammps_executable = lammps_params['executable_path']
 
     if not lammps_in_path.exists():
-        print(f"Error: {lammps_in_path} not found. Please run setup_md_system.py first.")
+        logging.error(f"Error: {lammps_in_path} not found. Please run setup_md_system.py first.")
         return
 
     # --- 2. Run LAMMPS Simulation ---
-    # The `lammps` executable must be in the system's PATH.
-    command = f"lammps -in {lammps_in_path} -log {lammps_log_path}"
-    print(f"Executing command: {command}")
+    command = f"{lammps_executable} -in {lammps_in_path} -log {lammps_log_path}"
+    logging.info(f"Executing command: {command}")
     
     try:
         subprocess.run(command, shell=True, check=True)
-        print(f"LAMMPS simulation completed successfully. Log file at: {lammps_log_path}")
+        logging.info(f"LAMMPS simulation completed successfully. Log file at: {lammps_log_path}")
     except subprocess.CalledProcessError as e:
-        print(f"Error running LAMMPS: {e}")
+        logging.error(f"Error running LAMMPS: {e}")
         return
 
     # --- 3. Parse LAMMPS Output ---
     parsed_data = parse_lammps_log(lammps_log_path)
     if not parsed_data:
-        print("Could not parse LAMMPS log file.")
+        logging.error("Could not parse LAMMPS log file.")
         return
 
     # --- 4. Save Parsed Data ---
-    output_path = Path("results/reactive_md_data.json")
+    output_path = Path("results/reactive_md_data.json") # This path is hardcoded, consider making it configurable
     output_path.parent.mkdir(exist_ok=True)
     with open(output_path, 'w') as f:
         json.dump(parsed_data, f, indent=4)
         
-    print(f"\nParsed LAMMPS data saved to {output_path}")
+    logging.info(f"Parsed LAMMPS data saved to {output_path}")
 
 if __name__ == "__main__":
     run_reactive_md()

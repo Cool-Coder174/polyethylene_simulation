@@ -60,7 +60,6 @@ class PolymerSimulationEnv(gym.Env):
         self.observation_space = Box(low=0.1, high=10.0, shape=(2,), dtype=np.float32)
         
         self.param_multipliers = np.array([1.0, 1.0])
-        self.reset()
 
     def _load_scission_model(self):
         """Loads the symbolic scission model from the JSON file."""
@@ -142,7 +141,7 @@ class PolymerSimulationEnv(gym.Env):
     def reset(self, seed=None, options=None):
         """Resets the environment for a new episode."""
         super().reset(seed=seed)
-        self.param_multipliers = np.array([1.0, 1.0])
+        # self.param_multipliers is initialized in __init__
         return self._get_rl_state(), {}
 
     def step(self, action: np.ndarray):
@@ -189,18 +188,7 @@ class PolymerSimulationEnv(gym.Env):
 
     def _run_lammps_simulation(self):
         """Runs the LAMMPS simulation and returns the results."""
-        lmp = lammps()
-        # TODO: Add LAMMPS commands to run the simulation
-        # This will involve creating a LAMMPS input script,
-        # running the simulation, and parsing the output.
-        # For now, we'll return dummy data.
-        return {
-            dose_rate: {
-                'scission': np.zeros_like(data['time_hr']),
-                'crosslink': np.zeros_like(data['time_hr'])
-            }
-            for dose_rate, data in self.true_data.items()
-        }
+        raise NotImplementedError("LAMMPS simulation is not yet implemented.")
 
     def _get_rl_state(self) -> np.ndarray:
         """Returns the current state for the RL agent."""
@@ -239,16 +227,9 @@ class PolymerSimulationEnv(gym.Env):
             for dose_rate, values in self.predicted_data.items():
                 for i, time in enumerate(self.true_data[dose_rate]['time_hr']):
                     data_to_log.append({
-                        "run_id": self.run_id,
-                        "optuna_trial_id": self.optuna_trial_id,
-                        "episode_num": self.episode_num,
                         "day": time,
-                        "chain_length_avg": self.chain_length_avg,
-                        "num_chains": self.num_chains,
-                        "avg_node_connectivity": self.avg_node_connectivity,
                         "crosslinking_pct": values['crosslink'][i],
                         "scission_pct": values['scission'][i],
-                        "graph_laplacian_l2": self.graph_laplacian_l2
                     })
         return pd.DataFrame(data_to_log)
 

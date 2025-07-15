@@ -6,16 +6,26 @@ import ase.io
 from ase.build import polymer
 from ase.io import lammpsdata
 from pathlib import Path
+import yaml
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def setup_md_system():
     """
     Builds a polyethylene system and writes LAMMPS input files.
     """
-    print("--- Setting up Molecular Dynamics System for LAMMPS ---")
+    logging.info("--- Setting up Molecular Dynamics System for LAMMPS ---")
+
+    # Load configuration
+    config_path = Path(__file__).parent.parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 
     # --- 1. System Configuration ---
-    n_chains = 10
-    n_monomers_per_chain = 50
+    n_chains = config['run_parameters']['n_chain']
+    n_monomers_per_chain = config['run_parameters']['l_chain']
     output_dir = Path("data")
     output_dir.mkdir(exist_ok=True)
     output_data = output_dir / "pe_system.data"
@@ -43,9 +53,17 @@ def setup_md_system():
 
     # --- 3. Write LAMMPS Data File ---
     lammpsdata.write_lammps_data(str(output_data), system, atom_style='full')
-    print(f"LAMMPS data file saved to {output_data}")
+    logging.info(f"LAMMPS data file saved to {output_data}")
 
     # --- 4. Write LAMMPS Input Script ---
+    lammps_params = config['lammps_parameters']
+    force_field_params = config['lammps_force_field_parameters'] # New section in config.yaml
+
+    # Read reactions.in content
+    reactions_path = Path(__file__).parent.parent / 'reactions.in'
+    with open(reactions_path, 'r') as f:
+        reactions_content = f.read()
+
     with open(output_in, 'w') as f:
         f.write("# Polyethylene simulation input script\n")
         f.write("units          real\n")
@@ -53,28 +71,24 @@ def setup_md_system():
         f.write(f"read_data      {output_data}\n")
         f.write("\n")
         f.write("# Define force field parameters\n")
-        f.write("pair_style     lj/cut 2.5\n")
-        f.write("pair_coeff     1 1 1.0 1.0 2.5\n")
-        f.write("bond_style     harmonic\n")
-        f.write("bond_coeff     1 100.0 1.54\n")
-        f.write("\n")
-        f.write("# Define simulation settings\n")
-        f.write("neighbor       2.0 bin\n")
-        f.write("neigh_modify   delay 10\n")
+        f.write(f"pair_style     {force_field_params['pair_style']}\n")
+        f.write(f"pair_coeff     {force_field_params['pair_coeff']}\n")
+        f.write(f"bond_style     {force_field_params['bond_style']}\n")
+        f.write(f"bond_coeff     {force_field_params['bond_coeff']}\n")
         f.write("\n")
         f.write("# Include reactions\n")
-        f.write("include        reactions.in\n")
+        f.write(reactions_content) # Include content of reactions.in directly
         f.write("\n")
         f.write("# Define thermo output\n")
         f.write("thermo_style   custom step temp press toteng f_rx\n")
         f.write("thermo         100\n")
         f.write("\n")
         f.write("# Run simulation\n")
-        f.write("fix            1 all nvt temp 300.0 300.0 100.0\n")
-        f.write("timestep       1.0\n")
-        f.write("run            10000\n")
+        f.write(f"fix            1 all nvt temp {lammps_params['temp']} {lammps_params['temp']} {lammps_params['temp_damping']}\n")
+        f.write(f"timestep       {lammps_params['timestep']}\n")
+        f.write(f"run            {lammps_params['run_steps']}\n")
 
-    print(f"LAMMPS input script saved to {output_in}")
+    logging.info(f"LAMMPS input script saved to {output_in}")
 
 if __name__ == "__main__":
     setup_md_system()
