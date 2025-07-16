@@ -193,7 +193,7 @@ class SAC:
         # Access the default values for gamma and tau
         self.gamma = config['rl_hyperparameters']['gamma']['default']
         self.tau = config['rl_hyperparameters']['tau']['default']
-        self.alpha = config['rl_hyperparameters']['alpha']
+        self.alpha = config['rl_hyperparameters']['alpha']['default']
         self.max_action = config['rl_hyperparameters']['max_action']
         self.auto_entropy_tuning = True
 
