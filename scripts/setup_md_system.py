@@ -33,9 +33,9 @@ def setup_md_system():
 
     # --- 2. Build Polymer Topology using ASE ---
     # Create a single polyethylene monomer
-    pe_monomer = ase.Atoms('C2H4', positions=[(0, 0, 0), (1.54, 0, 0), 
-                                             ( -0.54, 1.0, 0), ( -0.54, -1.0, 0),
-                                             (2.08, 1.0, 0), (2.08, -1.0, 0)])
+    monomer_type = config['monomer']['type']
+    monomer_positions = config['monomer']['positions']
+    pe_monomer = ase.Atoms(monomer_type, positions=monomer_positions)
     # Create a polymer chain from the monomer
     pe_polymer = polymer(pe_monomer, a=3.8, n=n_monomers_per_chain)
 

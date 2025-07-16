@@ -92,7 +92,7 @@ def run_reactive_md():
         return
 
     # --- 4. Save Parsed Data ---
-    output_path = Path("results/reactive_md_data.json") # This path is hardcoded, consider making it configurable
+    output_path = Path(config['output_path']) # Load output path from config
     output_path.parent.mkdir(exist_ok=True)
     with open(output_path, 'w') as f:
         json.dump(parsed_data, f, indent=4)
