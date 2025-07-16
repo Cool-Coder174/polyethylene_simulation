@@ -1,5 +1,5 @@
 """
-Tests for the PolymerSimulationEnv, focusing on the LAMMPS integration.
+Tests for the PolymerSimulationEnv, focusing on the kinetic model.
 """
 import pytest
 import numpy as np
@@ -22,6 +22,7 @@ def config():
 @pytest.fixture
 def env(config):
     """Fixture to create a fresh instance of the PolymerSimulationEnv for each test."""
+    config['model_selection']['model'] = 'B'
     return PolymerSimulationEnv(config, experimental_data_path="tests/experimental_data.json")
 
 def test_environment_initialization(env, config):

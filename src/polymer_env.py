@@ -1,11 +1,11 @@
+"""
 This module defines the PolymerSimulationEnv, a custom Gymnasium environment
 for simulating the degradation of polyethylene polymers. It integrates chemical kinetics
 with a graph-based polymer representation to model chain scission and crosslinking.
 
 This environment is designed to be used with reinforcement learning agents,
 allowing them to learn optimal strategies for controlling polymer degradation.
-
-
+"""
 import numpy as np
 import networkx as nx
 from scipy.integrate import solve_ivp
@@ -18,7 +18,6 @@ import sympy
 import gymnasium as gym
 from gymnasium.spaces import Box
 import logging
-from lammps import lammps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -46,6 +45,9 @@ class PolymerSimulationEnv(gym.Env):
         self.scission_model_path = scission_model_path or "models/scission_equation.json"
         self.experimental_data_path = experimental_data_path or "data/experimental_data.json"
         
+        if self.config['model_selection']['model'] == 'C':
+            raise NotImplementedError("Model 'C' (LAMMPS integration) is not yet implemented. Please choose a different model in config.yaml.")
+
         # Load kinetic rate constants
         kinetic_params_path = Path(self.config['physics_parameters']['kinetic_rate_constants_path'])
         with open(kinetic_params_path, 'r') as f:
@@ -151,8 +153,6 @@ class PolymerSimulationEnv(gym.Env):
 
         if self.config['model_selection']['model'] == 'B':
             self.predicted_data = self._run_ode_simulation()
-        elif self.config['model_selection']['model'] == 'C':
-            self.predicted_data = self._run_lammps_simulation()
         else:
             raise ValueError(f"Unsupported model type: {self.config['model_selection']['model']}")
 
