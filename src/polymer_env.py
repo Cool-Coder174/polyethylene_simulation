@@ -6,7 +6,6 @@ with a graph-based polymer representation to model chain scission and crosslinki
 This environment is designed to be used with reinforcement learning agents,
 allowing them to learn optimal strategies for controlling polymer degradation.
 """
-
 import numpy as np
 import networkx as nx
 from scipy.integrate import solve_ivp
@@ -46,6 +45,9 @@ class PolymerSimulationEnv(gym.Env):
         self.scission_model_path = scission_model_path or "models/scission_equation.json"
         self.experimental_data_path = experimental_data_path or "data/experimental_data.json"
         
+        if self.config['model_selection']['model'] == 'C':
+            raise NotImplementedError("Model 'C' (LAMMPS integration) is not yet implemented. Please choose a different model in config.yaml.")
+
         # Load kinetic rate constants
         kinetic_params_path = Path(self.config['physics_parameters']['kinetic_rate_constants_path'])
         with open(kinetic_params_path, 'r') as f:
@@ -60,7 +62,6 @@ class PolymerSimulationEnv(gym.Env):
         self.observation_space = Box(low=0.1, high=10.0, shape=(2,), dtype=np.float32)
         
         self.param_multipliers = np.array([1.0, 1.0])
-        self.reset()
 
     def _load_scission_model(self):
         """Loads the symbolic scission model from the JSON file."""
@@ -142,7 +143,7 @@ class PolymerSimulationEnv(gym.Env):
     def reset(self, seed=None, options=None):
         """Resets the environment for a new episode."""
         super().reset(seed=seed)
-        self.param_multipliers = np.array([1.0, 1.0])
+        # self.param_multipliers is initialized in __init__
         return self._get_rl_state(), {}
 
     def step(self, action: np.ndarray):
@@ -150,7 +151,20 @@ class PolymerSimulationEnv(gym.Env):
         self.param_multipliers *= np.exp(action * 0.1)
         self.param_multipliers = np.clip(self.param_multipliers, self.observation_space.low, self.observation_space.high)
 
-        self.predicted_data = {}
+        if self.config['model_selection']['model'] == 'B':
+            self.predicted_data = self._run_ode_simulation()
+        else:
+            raise ValueError(f"Unsupported model type: {self.config['model_selection']['model']}")
+
+        reward = self._calculate_reward(self.predicted_data)
+        done = True  # Episode is always done after one step
+        next_observation = self._get_rl_state()
+        
+        return next_observation, reward, done, False, {}
+
+    def _run_ode_simulation(self):
+        """Runs the ODE-based simulation."""
+        predicted_data = {}
         initial_concentrations = list(self.config['physics_parameters']['initial_concentrations'].values())
 
         for dose_rate, data in self.true_data.items():
@@ -166,16 +180,15 @@ class PolymerSimulationEnv(gym.Env):
                 t_eval=t_eval
             )
             
-            self.predicted_data[dose_rate] = {
+            predicted_data[dose_rate] = {
                 'scission': sol.y[-1],
                 'crosslink': sol.y[-2]
             }
+        return predicted_data
 
-        reward = self._calculate_reward(self.predicted_data)
-        done = True  # Episode is always done after one step
-        next_observation = self._get_rl_state()
-        
-        return next_observation, reward, done, False, {}
+    def _run_lammps_simulation(self):
+        """Runs the LAMMPS simulation and returns the results."""
+        raise NotImplementedError("LAMMPS simulation is not yet implemented.")
 
     def _get_rl_state(self) -> np.ndarray:
         """Returns the current state for the RL agent."""
@@ -214,15 +227,35 @@ class PolymerSimulationEnv(gym.Env):
             for dose_rate, values in self.predicted_data.items():
                 for i, time in enumerate(self.true_data[dose_rate]['time_hr']):
                     data_to_log.append({
-                        "run_id": self.run_id,
-                        "optuna_trial_id": self.optuna_trial_id,
-                        "episode_num": self.episode_num,
                         "day": time,
-                        "chain_length_avg": self.chain_length_avg,
-                        "num_chains": self.num_chains,
-                        "avg_node_connectivity": self.avg_node_connectivity,
                         "crosslinking_pct": values['crosslink'][i],
                         "scission_pct": values['scission'][i],
-                        "graph_laplacian_l2": self.graph_laplacian_l2
                     })
         return pd.DataFrame(data_to_log)
+
+    def render(self, mode='human'):
+        """Renders the environment (not implemented)."""
+        pass
+
+if __name__ == '__main__':
+    # Example usage of the PolymerSimulationEnv
+    config_path = Path(__file__).parent.parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    env = PolymerSimulationEnv(config)
+    obs, _ = env.reset()
+    
+    # Example of taking a random action
+    action = env.action_space.sample()
+    next_obs, reward, done, _, _ = env.step(action)
+    
+    logging.info(f"Initial Observation: {obs}")
+    logging.info(f"Action Taken: {action}")
+    logging.info(f"Next Observation: {next_obs}")
+    logging.info(f"Reward: {reward}")
+    logging.info(f"Done: {done}")
+    
+    # Example of getting the simulation data
+    df = env.get_simulation_data_df()
+    print(df.head())

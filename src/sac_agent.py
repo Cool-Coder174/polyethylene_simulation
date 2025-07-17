@@ -190,9 +190,10 @@ class SAC:
         """
         Initializes the DSAC agent.
         """
-        self.gamma = config['rl_hyperparameters']['gamma']
-        self.tau = config['rl_hyperparameters']['tau']
-        self.alpha = config['rl_hyperparameters']['alpha']
+        # Access the default values for gamma and tau
+        self.gamma = config['rl_hyperparameters']['gamma']['default']
+        self.tau = config['rl_hyperparameters']['tau']['default']
+        self.alpha = config['rl_hyperparameters']['alpha']['default']
         self.max_action = config['rl_hyperparameters']['max_action']
         self.auto_entropy_tuning = True
 
@@ -214,7 +215,7 @@ class SAC:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=config['rl_hyperparameters']['learning_rate'])
 
         if self.auto_entropy_tuning:
-            self.target_entropy = -torch.prod(torch.Tensor(action_dim).to(device)).item()
+            self.target_entropy = -action_dim
             self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
             self.alpha_optimizer = optim.Adam([self.log_alpha], lr=config['rl_hyperparameters']['learning_rate'])
 

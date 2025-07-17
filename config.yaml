@@ -11,12 +11,14 @@ run_parameters:
     crosslink_tolerance: 0.02
   param_bounds:
     dose_rate: [0.0, 10.0] # Min and Max dose rate
+    temperature: [200.0, 400.0]
 
 # --- 2. Model Selection: Choose the simulation engine ---
 model_selection:
   # Model 'A': Original graph-based model (deprecated)
   # Model 'B': Kinetics-driven ODE model
-  model: 'B'
+  # Model 'C': Hybrid model (Kinetics-driven ODE + LAMMPS)
+  model: 'C'
 
 # --- 3. RL Hyperparameters: SAC agent and training loop ---
 rl_hyperparameters:
@@ -69,15 +71,47 @@ physics_parameters:
   simulation_box_size: [10.0, 10.0, 10.0] # nm (should be grid_dimensions * voxel_size)
   time_step: 3600 # s
 
-# --- 5. Output Paths: Where to save results ---
+# --- 5. LAMMPS Parameters: Settings for the simulation ---
+lammps_parameters:
+  input_data_path: "data/pe_system.data"
+  input_script_path: "data/pe_system.in"
+  log_path: "data/pe_system.log"
+  executable_path: "lammps" # Assumes lammps is in the system PATH
+  temp: 300.0
+  temp_damping: 100.0
+  timestep: 1.0
+  run_steps: 10000
+
+# --- 5.1. LAMMPS Force Field Parameters ---
+lammps_force_field_parameters:
+  pair_style: "lj/cut 2.5"
+  pair_coeff: "1 1 1.0 1.0 2.5"
+  bond_style: "harmonic"
+  bond_coeff: "1 100.0 1.54"
+
+# --- 6. Output Paths: Where to save results ---
 output_paths:
   database_path: "results/simulation_data.db"
   plot_path: "results/plots/"
   model_path: "results/models/"
 
-# --- 6. Script Paths: Locations of executable scripts ---
+# --- 7. Script Paths: Locations of executable scripts ---
 script_paths:
   md_setup: "scripts/setup_md_system.py"
   symbolic_regression: "scripts/discover_scission_model.py"
   reactive_md: "scripts/run_reactive_md.py"
   rl_fine_tuning: "fine_tune_model.py"
+
+# --- 8. Monomer Definition: Properties of the basic repeating unit ---
+monomer:
+  type: polyethylene
+  symbols: ['C', 'C', 'H', 'H', 'H', 'H'] # <-- This line is crucial
+  positions:
+    - [0.00000, 0.00000, 0.00000]
+    - [0.00000, 0.00000, 1.27500]
+    - [0.66900, 0.81700, -0.63800]
+    - [-0.66900, -0.81700, -0.63800]
+    - [0.66900, 0.81700, 1.91300]
+    - [-0.66900, -0.81700, 1.91300]
+  cell: [7.41, 4.93, 2.55]
+  pbc: [True, True, True]

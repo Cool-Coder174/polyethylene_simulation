@@ -326,4 +326,3 @@ That’s all, folks! 🚀 Now get in there, mess around, and may your compute no
 
 
 Practice makes perfect—log in, transfer files, load modules, and submit a job or two. Soon you’ll be running simulations so big, your laptop will feel like a potato next to Kamiak. Good luck, and may your job queues be ever short! 🎉
-

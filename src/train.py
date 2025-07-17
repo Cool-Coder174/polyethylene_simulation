@@ -58,21 +58,26 @@ def objective(trial: optuna.trial.Trial) -> float:
     status = "running" # Initial status of the run
     final_reward = 0.0 # Initialize final reward
 
-    # Initialize the environment and reset it to get initial metadata
+    # Initialize environment, agent, and replay buffer for the current trial.
     env = PolymerSimulationEnv(config)
-    initial_dose_rate = env.reset() # Reset environment and get initial dose rate
+        agent = SAC(trial_config) # Pass the updated config to the SAC agent
+        replay_buffer = ReplayBuffer()
 
-    # Log run metadata after environment reset to ensure accurate initialization
-    log_run_metadata(db_path, {
-        "run_id": run_id,
-        "optuna_trial_id": trial.number, # Optuna's unique trial number
-        "start_time": start_time.isoformat(),
-        "end_time": None,
-        "duration_seconds": None,
-        "initial_dose_rate": initial_dose_rate,
-        "final_reward": final_reward,
-        "status": status
-    })
+        total_reward = 0.0 # Accumulator for the total reward in this trial
+        state = env.reset() # Reset the environment to get the initial state
+        initial_dose_rate = env.dose_rate # Capture the initial dose rate after environment reset
+
+        # Log run metadata after environment reset to ensure accurate initialization
+        log_run_metadata(db_path, {
+            "run_id": run_id,
+            "optuna_trial_id": trial.number, # Optuna's unique trial number
+            "start_time": start_time.isoformat(),
+            "end_time": None,
+            "duration_seconds": None,
+            "initial_dose_rate": initial_dose_rate,
+            "final_reward": final_reward,
+            "status": status
+        })
 
     try:
         # --- Hyperparameter Suggestion by Optuna ---
@@ -96,8 +101,9 @@ def objective(trial: optuna.trial.Trial) -> float:
         replay_buffer = ReplayBuffer()
 
         total_reward = 0.0 # Accumulator for the total reward in this trial
-        state = env.reset() # Reset the environment to get the initial state
-        initial_dose_rate = env.dose_rate # Capture the initial dose rate after environment reset
+        state = env.initial_state # Retrieve the initial state directly from the environment
+        # initial_dose_rate is no longer returned by env.reset(), it's passed to the constructor
+        initial_dose_rate = trial_config['run_parameters']['param_bounds']['dose_rate'][0] # Assuming first value is initial dose rate
 
         # Update the run_metadata with the actual initial dose rate.
         log_run_metadata(db_path, {
@@ -216,13 +222,20 @@ if __name__ == "__main__":
             """
             def suggest_float(self, name, low, high, log=False):
                 # Return the fixed hyperparameters from the config.
-                params = {
-                    "lr": config['rl_hyperparameters']['learning_rate'],
-                    "gamma": config['rl_hyperparameters']['gamma']['default'], # Use default if specified
-                    "tau": config['rl_hyperparameters']['tau']['default'],     # Use default if specified
-                    "alpha": config['rl_hyperparameters']['alpha']['default'] # Use default if specified
-                }
-                return params[name]
+                # Handle cases where gamma, tau, alpha might be direct values or dicts with 'default'
+                if name == "gamma":
+                    val = config['rl_hyperparameters']['gamma']
+                    return val['default'] if isinstance(val, dict) else val
+                elif name == "tau":
+                    val = config['rl_hyperparameters']['tau']
+                    return val['default'] if isinstance(val, dict) else val
+                elif name == "alpha":
+                    val = config['rl_hyperparameters']['alpha']
+                    return val['default'] if isinstance(val, dict) else val
+                elif name == "lr":
+                    return config['rl_hyperparameters']['learning_rate']
+                else:
+                    raise ValueError(f"Unknown hyperparameter: {name}")
             
             def report(self, val, step): 
                 pass # No reporting needed for a single run

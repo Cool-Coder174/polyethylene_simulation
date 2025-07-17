@@ -1,83 +1,105 @@
+
 """
-This script sets up a small, amorphous polyethylene simulation cell using OpenMM,
-performs energy minimization and equilibration, and saves the final system state.
+This script sets up a small, amorphous polyethylene simulation cell using ASE and LAMMPS.
 """
-import openmm as mm
-from openmm import app, unit
+import ase.io
+from ase.build import make_supercell
+from ase.io import lammpsdata
 from pathlib import Path
+import yaml
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def setup_md_system():
     """
-    Builds, parameterizes, and equilibrates a polyethylene system.
+    Builds a polyethylene system and writes LAMMPS input files.
     """
-    print("--- Setting up Molecular Dynamics System ---")
+    logging.info("--- Setting up Molecular Dynamics System for LAMMPS ---")
+
+    # Load configuration
+    config_path = Path(__file__).parent.parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 
     # --- 1. System Configuration ---
-    n_chains = 50
-    n_monomers_per_chain = 100
+    n_chains = config['run_parameters']['n_chain']
+    n_monomers_per_chain = config['run_parameters']['l_chain']
     output_dir = Path("data")
     output_dir.mkdir(exist_ok=True)
-    output_pdb = output_dir / "equilibrated_pe_system.pdb"
-    output_xml = output_dir / "equilibrated_pe_system.xml"
+    output_data = output_dir / "pe_system.data"
+    output_in = output_dir / "pe_system.in"
 
-    # --- 2. Build Polymer Topology ---
-    # Create a PDB file for a single polyethylene chain (C100H202)
-    # This is a simplified representation. For GAFF2, atom types would be crucial.
-    # For OPLS-AA, we rely on OpenMM's residue templates.
-    pdb = app.PDBFile(str(output_dir / 'polyethylene_chain.pdb'))
+    # --- 2. Build Polymer Topology using ASE ---
+    # Create a single polyethylene monomer
+    monomer_symbols = config['monomer']['symbols'] # <-- NEW: Get symbols from config
+    monomer_positions = config['monomer']['positions']
+    # cell and pbc are required for correct periodic boundary conditions in ASE
+    monomer_cell = config['monomer']['cell']
+    monomer_pbc = config['monomer']['pbc']
+
+    # Now, pass symbols, positions, cell, and pbc to ase.Atoms
+    pe_monomer = ase.Atoms(monomer_symbols,
+                        positions=monomer_positions,
+                        cell=monomer_cell,
+                        pbc=monomer_pbc)
+
+    # Create a polymer chain from the monomer
+    supercell_matrix = [[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, n_monomers_per_chain]]   
+    pe_polymer = make_supercell(pe_monomer, supercell_matrix)
+    # Replicate the polymer to create a simulation box
+    pe_polymers = [pe_polymer.copy() for _ in range(n_chains)]
+    for i, p in enumerate(pe_polymers):
+        p.translate([i * 2, i * 2, 0]) # Simple translation to avoid overlap
     
-    # --- 3. Setup Simulation using OPLS-AA Force Field ---
-    # OPLS-AA is a good choice for alkanes.
-    forcefield = app.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
-    
-    modeller = app.Modeller(pdb.topology, pdb.positions)
-    
-    # Add more chains to create an amorphous cell
-    # This is a simplistic packing method. More advanced tools like Packmol
-    # would provide better results but require external dependencies.
-    for i in range(n_chains - 1):
-        modeller.add(pdb.topology, pdb.positions)
+    system = pe_polymers[0]
+    for i in range(1, len(pe_polymers)):
+        system.extend(pe_polymers[i])
 
-    print(f"System contains {modeller.topology.getNumAtoms()} atoms.")
+    system.set_cell([20, 20, 20])
+    system.center()
 
-    # --- 4. Create System and Set up Simulation ---
-    system = forcefield.createSystem(modeller.topology, nonbondedMethod=app.PME,
-                                     nonbondedCutoff=1.0*unit.nanometers,
-                                     constraints=app.HBonds)
-    
-    # Use a robust integrator for equilibration
-    integrator = mm.LangevinMiddleIntegrator(300*unit.kelvin, 1/unit.picosecond, 0.002*unit.picoseconds)
-    
-    simulation = app.Simulation(modeller.topology, system, integrator)
-    simulation.context.setPositions(modeller.positions)
+    # --- 3. Write LAMMPS Data File ---
+    lammpsdata.write_lammps_data(str(output_data), system, atom_style='full')
+    logging.info(f"LAMMPS data file saved to {output_data}")
 
-    # --- 5. Energy Minimization ---
-    print("Performing energy minimization...")
-    simulation.minimizeEnergy()
-    min_energy = simulation.context.getState(getEnergy=True).getPotentialEnergy()
-    print(f"Minimized energy: {min_energy}")
+    # --- 4. Write LAMMPS Input Script ---
+    lammps_params = config['lammps_parameters']
+    force_field_params = config['lammps_force_field_parameters'] # New section in config.yaml
 
-    # --- 6. NPT Equilibration ---
-    # Add a barostat for constant pressure simulation
-    system.addForce(mm.MonteCarloBarostat(1*unit.bar, 300*unit.kelvin))
-    # Re-initialize the simulation with the barostat
-    simulation.context.reinitialize(preserveState=True)
+    # Read reactions.in content
+    reactions_path = Path(__file__).parent.parent / 'reactions.in'
+    with open(reactions_path, 'r') as f:
+        reactions_content = f.read()
 
-    print("Running NPT equilibration...")
-    simulation.step(50000) # Run for 100 ps
+    with open(output_in, 'w') as f:
+        f.write("# Polyethylene simulation input script\n")
+        f.write("units          real\n")
+        f.write("atom_style     full\n")
+        f.write(f"read_data      {output_data}\n")
+        f.write("\n")
+        f.write("# Define force field parameters\n")
+        f.write(f"pair_style     {force_field_params['pair_style']}\n")
+        f.write(f"pair_coeff     {force_field_params['pair_coeff']}\n")
+        f.write(f"bond_style     {force_field_params['bond_style']}\n")
+        f.write(f"bond_coeff     {force_field_params['bond_coeff']}\n")
+        f.write("\n")
+        f.write("# Include reactions\n")
+        f.write(reactions_content) # Include content of reactions.in directly
+        f.write("\n")
+        f.write("# Define thermo output\n")
+        f.write("thermo_style   custom step temp press toteng f_rx\n")
+        f.write("thermo         100\n")
+        f.write("\n")
+        f.write("# Run simulation\n")
+        f.write(f"fix            1 all nvt temp {lammps_params['temp']} {lammps_params['temp']} {lammps_params['temp_damping']}\n")
+        f.write(f"timestep       {lammps_params['timestep']}\n")
+        f.write(f"run            {lammps_params['run_steps']}\n")
 
-    # --- 7. Save the Equilibrated System ---
-    state = simulation.context.getState(getPositions=True, getVelocities=True)
-    
-    # Save as PDB
-    with open(output_pdb, 'w') as f:
-        app.PDBFile.writeFile(simulation.topology, state.getPositions(), f)
-    
-    # Save as XML for easy reloading in OpenMM
-    with open(output_xml, 'w') as f:
-        f.write(mm.XmlSerializer.serialize(state))
-
-    print(f"Equilibrated system saved to {output_pdb} and {output_xml}")
+    logging.info(f"LAMMPS input script saved to {output_in}")
 
 if __name__ == "__main__":
     setup_md_system()

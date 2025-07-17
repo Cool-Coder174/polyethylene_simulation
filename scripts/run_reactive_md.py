@@ -1,116 +1,103 @@
 
-This script runs a reactive molecular dynamics simulation to calculate
-ab-initio kinetic rate constants for key reactions in polyethylene degradation.
 """
-import numpy as np
-import json
+This script runs a reactive molecular dynamics simulation using LAMMPS and parses the output.
+"""
+import subprocess
 from pathlib import Path
-import openmm as mm
-from openmm import app, unit
+import re
+import json
+import yaml
+import logging
 
-# --- Constants for Eyring Equation ---
-k_B = 1.380649e-23 * unit.joule/unit.kelvin  # Boltzmann constant
-h = 6.62607015e-34 * unit.joule * unit.second # Planck constant
-R = 8.314462618 * unit.joule/unit.mole/unit.kelvin # Ideal gas constant
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def calculate_activation_energy_qmmm(system, reaction_type: str) -> unit.Quantity:
+def parse_lammps_log(log_path: Path) -> dict:
     """
-    Placeholder function for a full QM/MM activation energy calculation.
-
-    In a real implementation, this function would:
-    1.  Identify the atoms involved in the specified reaction (e.g., two PEOO* radicals).
-    2.  Define the QM region (the reacting atoms) and the MM region (the rest of the system).
-    3.  Interface with a quantum chemistry engine (e.g., xTB, ORCA, Gaussian).
-    4.  Perform a transition state search (e.g., Nudged Elastic Band or Berny optimization)
-        to find the energy barrier for the reaction.
-    5.  Return the calculated activation energy (enthalpy of activation, dH).
+    Parses the LAMMPS log file to extract simulation data.
 
     Args:
-        system: The OpenMM system object.
-        reaction_type (str): The type of reaction ('crosslinking' or 'scission').
+        log_path (Path): The path to the LAMMPS log file.
 
     Returns:
-        unit.Quantity: A placeholder activation energy in kJ/mol.
+        dict: A dictionary containing the parsed data.
     """
-    print(f"--- Running Placeholder QM/MM for {reaction_type} ---")
-    print("NOTE: This is NOT a real QM/MM calculation.")
-    
-    if reaction_type == "crosslinking":
-        # Plausible activation energy for radical-radical combination, which is typically low.
-        activation_energy = 25.0 * unit.kilojoules_per_mole
-    elif reaction_type == "scission":
-        # Plausible activation energy for C-C bond scission, which is typically high.
-        activation_energy = 150.0 * unit.kilojoules_per_mole
-    else:
-        raise ValueError("Unknown reaction type")
-        
-    print(f"Placeholder activation energy: {activation_energy}")
-    return activation_energy
+    data = {
+        "timesteps": [],
+        "temp": [],
+        "press": [],
+        "toteng": [],
+        "f_rx": [] # Output from fix rx
+    }
 
-def eyring_equation(delta_H: unit.Quantity, T: unit.Quantity) -> float:
-    """
-    Calculates a rate constant (k) from activation enthalpy (delta_H) using the
-    Eyring equation from transition state theory.
+    with open(log_path, 'r') as f:
+        log_content = f.read()
 
-    This calculation assumes the transmission coefficient is 1 and that the
-    entropy of activation (delta_S) is negligible, which is a common simplification.
+    # Find the start and end of the thermo data
+    start_match = re.search(r"Step\s+Temp\s+Press\s+TotEng\s+f_rx", log_content)
+    end_match = re.search(r"Loop time of", log_content)
 
-    k = (k_B * T / h) * exp(-delta_H / (R * T))
+    if not start_match or not end_match:
+        return {}
 
-    Args:
-        delta_H (unit.Quantity): Enthalpy of activation (e.g., in kJ/mol).
-        T (unit.Quantity): Temperature (e.g., in Kelvin).
+    data_block = log_content[start_match.end():end_match.start()]
 
-    Returns:
-        float: The calculated first-order rate constant in 1/s.
-    """
-    exponent = -delta_H / (R * T)
-    pre_factor = (k_B * T) / h
-    rate_constant = pre_factor * np.exp(exponent)
-    return rate_constant.value_in_unit(unit.second**-1)
+    for line in data_block.strip().split('\n'):
+        parts = line.split()
+        if len(parts) == 5: # Now expecting 5 columns: Step, Temp, Press, TotEng, f_rx
+            data["timesteps"].append(int(parts[0]))
+            data["temp"].append(float(parts[1]))
+            data["press"].append(float(parts[2]))
+            data["toteng"].append(float(parts[3]))
+            data["f_rx"].append(float(parts[4])) # Assuming f_rx is a float or int
+
+    return data
 
 def run_reactive_md():
     """
-    Main function to orchestrate the reactive MD simulation.
+    Main function to orchestrate the reactive MD simulation with LAMMPS.
     """
-    print("--- Running Reactive MD for Rate Constant Calculation ---")
+    logging.info("--- Running Reactive MD with LAMMPS ---")
     
-    # --- 1. Load the Equilibrated System ---
-    system_xml_path = Path("data/equilibrated_pe_system.xml")
-    if not system_xml_path.exists():
-        print(f"Error: {system_xml_path} not found. Please run setup_md_system.py first.")
+    # Load configuration
+    config_path = Path(__file__).parent.parent / 'config.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    # --- 1. Define Paths from config ---
+    lammps_params = config['lammps_parameters']
+    lammps_in_path = Path(lammps_params['input_script_path'])
+    lammps_log_path = Path(lammps_params['log_path'])
+    lammps_executable = lammps_params['executable_path']
+
+    if not lammps_in_path.exists():
+        logging.error(f"Error: {lammps_in_path} not found. Please run setup_md_system.py first.")
         return
-        
-    with open(system_xml_path, 'r') as f:
-        system_state = mm.XmlSerializer.deserialize(f.read())
 
-    # --- 2. Calculate Activation Energies (using placeholder) ---
-    Ea_crosslinking = calculate_activation_energy_qmmm(system_state, "crosslinking")
-    Ea_scission = calculate_activation_energy_qmmm(system_state, "scission")
+    # --- 2. Run LAMMPS Simulation ---
+    command = f"{lammps_executable} -in {lammps_in_path} -log {lammps_log_path}"
+    logging.info(f"Executing command: {command}")
+    
+    try:
+        subprocess.run(command, shell=True, check=True)
+        logging.info(f"LAMMPS simulation completed successfully. Log file at: {lammps_log_path}")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error running LAMMPS: {e}")
+        return
 
-    # --- 3. Convert to Rate Constants using Eyring Equation ---
-    temp = 300 * unit.kelvin
-    k_crosslink = eyring_equation(Ea_crosslinking, temp)
-    k_scission = eyring_equation(Ea_scission, temp)
+    # --- 3. Parse LAMMPS Output ---
+    parsed_data = parse_lammps_log(lammps_log_path)
+    if not parsed_data:
+        logging.error("Could not parse LAMMPS log file.")
+        return
 
-    print(f"\nCalculated rate constant for crosslinking at {temp}: {k_crosslink:.4e} 1/s")
-    print(f"Calculated rate constant for scission at {temp}: {k_scission:.4e} 1/s")
-
-    # --- 4. Save the Ab-Initio Parameters ---
-    ab_initio_params = {
-        "temperature_K": temp.value_in_unit(unit.kelvin),
-        "activation_energy_crosslinking_kJ_mol": Ea_crosslinking.value_in_unit(unit.kilojoules_per_mole),
-        "activation_energy_scission_kJ_mol": Ea_scission.value_in_unit(unit.kilojoules_per_mole),
-        "k_crosslink_s-1": k_crosslink,
-        "k_scission_s-1": k_scission
-    }
-
-    output_path = Path("models/ab_initio_params.json")
+    # --- 4. Save Parsed Data ---
+    output_path = Path(config['output_path']) # Load output path from config
     output_path.parent.mkdir(exist_ok=True)
     with open(output_path, 'w') as f:
-        json.dump(ab_initio_params, f, indent=4)
+        json.dump(parsed_data, f, indent=4)
         
-    print(f"\nAb-initio rate constants saved to {output_path}")
+    logging.info(f"Parsed LAMMPS data saved to {output_path}")
 
 if __name__ == "__main__":
     run_reactive_md()
