@@ -35,7 +35,7 @@ def setup_md_system():
     # Create a single polyethylene monomer
     monomer_symbols = config['monomer']['symbols'] # <-- NEW: Get symbols from config
     monomer_positions = config['monomer']['positions']
-    # You might also need monomer_cell and monomer_pbc here
+    # cell and pbc are required for correct periodic boundary conditions in ASE
     monomer_cell = config['monomer']['cell']
     monomer_pbc = config['monomer']['pbc']
 
