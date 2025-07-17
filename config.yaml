@@ -101,3 +101,17 @@ script_paths:
   symbolic_regression: "scripts/discover_scission_model.py"
   reactive_md: "scripts/run_reactive_md.py"
   rl_fine_tuning: "fine_tune_model.py"
+
+# --- 8. Monomer Definition: Properties of the basic repeating unit ---
+monomer:
+  type: polyethylene
+  symbols: ['C', 'C', 'H', 'H', 'H', 'H'] # <-- This line is crucial
+  positions:
+    - [0.00000, 0.00000, 0.00000]
+    - [0.00000, 0.00000, 1.27500]
+    - [0.66900, 0.81700, -0.63800]
+    - [-0.66900, -0.81700, -0.63800]
+    - [0.66900, 0.81700, 1.91300]
+    - [-0.66900, -0.81700, 1.91300]
+  cell: [7.41, 4.93, 2.55]
+  pbc: [True, True, True]

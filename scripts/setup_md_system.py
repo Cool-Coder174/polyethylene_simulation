@@ -3,7 +3,7 @@
 This script sets up a small, amorphous polyethylene simulation cell using ASE and LAMMPS.
 """
 import ase.io
-from ase.build import polymer
+from ase.build import make_supercell
 from ase.io import lammpsdata
 from pathlib import Path
 import yaml
@@ -33,12 +33,23 @@ def setup_md_system():
 
     # --- 2. Build Polymer Topology using ASE ---
     # Create a single polyethylene monomer
-    monomer_type = config['monomer']['type']
+    monomer_symbols = config['monomer']['symbols'] # <-- NEW: Get symbols from config
     monomer_positions = config['monomer']['positions']
-    pe_monomer = ase.Atoms(monomer_type, positions=monomer_positions)
-    # Create a polymer chain from the monomer
-    pe_polymer = polymer(pe_monomer, a=3.8, n=n_monomers_per_chain)
+    # You might also need monomer_cell and monomer_pbc here
+    monomer_cell = config['monomer']['cell']
+    monomer_pbc = config['monomer']['pbc']
 
+    # Now, pass symbols, positions, cell, and pbc to ase.Atoms
+    pe_monomer = ase.Atoms(monomer_symbols,
+                        positions=monomer_positions,
+                        cell=monomer_cell,
+                        pbc=monomer_pbc)
+
+    # Create a polymer chain from the monomer
+    supercell_matrix = [[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, n_monomers_per_chain]]   
+    pe_polymer = make_supercell(pe_monomer, supercell_matrix)
     # Replicate the polymer to create a simulation box
     pe_polymers = [pe_polymer.copy() for _ in range(n_chains)]
     for i, p in enumerate(pe_polymers):

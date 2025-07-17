@@ -1,0 +1,49 @@
+# Polyethylene simulation input script
+units          real
+atom_style     full
+read_data      data\pe_system.data
+
+# Define force field parameters
+pair_style     lj/cut 2.5
+pair_coeff     1 1 1.0 1.0 2.5
+bond_style     harmonic
+bond_coeff     1 100.0 1.54
+
+# Include reactions
+# reactions.in
+# --- Reaction Network for Polyethylene Degradation using fix rx ---
+
+# Define species
+# species 1: unreacted monomer
+# species 2: radical
+# species 3: crosslinked site
+# species 4: scissioned site
+
+# Define reactions
+# Reaction 1: Initiation (unreacted -> radical)
+# Reaction 2: Crosslinking (radical + radical -> crosslinked site)
+# Reaction 3: Scission (radical -> scissioned site)
+
+fix               rx all rx
+
+# Define reaction probabilities
+reaction          initiation 1 1.0e-5
+reaction          crosslinking 2 1.0e-6
+reaction          scission 1 1.0e-7
+
+# Define reaction products
+# Initiation: 1 -> 2
+react_product     initiation 2
+# Crosslinking: 2 + 2 -> 3
+react_product     crosslinking 3
+# Scission: 2 -> 4
+react_product     scission 4
+
+# Define thermo output
+thermo_style   custom step temp press toteng f_rx
+thermo         100
+
+# Run simulation
+fix            1 all nvt temp 300.0 300.0 100.0
+timestep       1.0
+run            10000
